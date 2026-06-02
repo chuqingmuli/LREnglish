@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useAppStore } from '../store'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Layout } from '../components/Layout'
+import { WordCard } from '../components/WordCard'
 import { ArrowLeft, CheckCircle2, XCircle, Eye } from 'lucide-react'
 
 export function Study() {
@@ -221,13 +222,6 @@ export function Study() {
     return (
       <div className="p-6 lg:ml-56">
         <div className="max-w-2xl mx-auto">
-          <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-6">
-            <div className="flex items-center justify-center gap-8 text-sm text-blue-700">
-              <span>← 左滑：不认识</span>
-              <span>→ 右滑：认识</span>
-              <span>空格：查看释义</span>
-            </div>
-          </div>
           <div className="flex items-center justify-between mb-8">
             <button
               onClick={() => navigate('/')}
@@ -242,66 +236,13 @@ export function Study() {
             </div>
           </div>
 
-          <div 
-            className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 mb-8 min-h-[300px] flex flex-col items-center justify-center cursor-grab active:cursor-grabbing"
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-          >
-            <h1 className="text-4xl font-bold text-slate-900 mb-6">{currentWord.word}</h1>
-            
-            {showMeaning && (
-                      <div className="text-center max-w-2xl">
-                        {currentWord.phonetic && (
-                          <p className="text-xl text-slate-500 mb-4">{currentWord.phonetic}</p>
-                        )}
-                        
-                        {currentWord.meaningEn && (
-                          <div className="mb-4">
-                            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">English</h4>
-                            <p className="text-lg text-slate-700">{currentWord.meaningEn}</p>
-                          </div>
-                        )}
-                        
-                        <div className="mb-4">
-                          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">中文释义</h4>
-                          <p className="text-xl text-slate-700">{currentWord.meaningCn || currentWord.meaning}</p>
-                        </div>
-                        
-                        {currentWord.example && (
-                          <div className="text-slate-500 italic border-l-2 border-emerald-300 pl-4 pr-2 py-2 bg-emerald-50/50 rounded-r-lg text-left max-w-md mx-auto">
-                            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">例句</h4>
-                            {currentWord.example}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-            {!showMeaning && (
-              <button
-                onClick={toggleMeaning}
-                className="px-6 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors"
-              >
-                查看释义
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              onClick={markWordUnknown}
-              className="py-4 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
-            >
-              <XCircle className="w-5 h-5" />
-              不认识
-            </button>
-            <button
-              onClick={markWordKnown}
-              className="py-4 bg-emerald-50 text-emerald-600 rounded-xl font-medium hover:bg-emerald-100 transition-colors flex items-center justify-center gap-2"
-            >
-              <CheckCircle2 className="w-5 h-5" />
-              认识
-            </button>
-          </div>
+          <WordCard
+            word={currentWord}
+            showMeaning={showMeaning}
+            onShowMeaning={toggleMeaning}
+            onKnown={markWordKnown}
+            onUnknown={markWordUnknown}
+          />
         </div>
       </div>
     )
