@@ -3,7 +3,7 @@ import { useAppStore } from '../store'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { WordCard } from '../components/WordCard'
-import { ArrowLeft, CheckCircle2, XCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, XCircle, Eye } from 'lucide-react'
 
 export function Study() {
   const { id: wordbookId } = useParams<{ id: string }>()
@@ -244,19 +244,26 @@ export function Study() {
             onUnknown={markWordUnknown}
           />
           
-          <div className="mt-12 grid grid-cols-2 gap-6">
+          <div className="mt-12 grid grid-cols-3 gap-4">
             <button
               onClick={markWordKnown}
-              className="py-5 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-2xl font-bold text-lg shadow-lg hover:from-emerald-600 hover:to-green-600 hover:shadow-xl transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-3"
+              className="py-5 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-2xl font-bold text-lg shadow-lg hover:from-emerald-600 hover:to-green-600 hover:shadow-xl transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-2"
             >
-              <CheckCircle2 className="w-7 h-7" />
+              <CheckCircle2 className="w-6 h-6" />
               认识
             </button>
             <button
-              onClick={markWordUnknown}
-              className="py-5 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-2xl font-bold text-lg shadow-lg hover:from-red-600 hover:to-rose-600 hover:shadow-xl transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-3"
+              onClick={toggleMeaning}
+              className="py-5 bg-gradient-to-r from-yellow-500 to-amber-500 text-white rounded-2xl font-bold text-lg shadow-lg hover:from-yellow-600 hover:to-amber-600 hover:shadow-xl transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-2"
             >
-              <XCircle className="w-7 h-7" />
+              <Eye className="w-6 h-6" />
+              查看释义
+            </button>
+            <button
+              onClick={markWordUnknown}
+              className="py-5 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-2xl font-bold text-lg shadow-lg hover:from-red-600 hover:to-rose-600 hover:shadow-xl transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-2"
+            >
+              <XCircle className="w-6 h-6" />
               不认识
             </button>
           </div>

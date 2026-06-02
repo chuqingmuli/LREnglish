@@ -81,12 +81,7 @@ export function WordCard({
     <div
       ref={cardRef}
       {...(swipeEnabled ? handlers : {})}
-      className="max-w-md mx-auto cursor-pointer select-none relative"
-      onClick={(e) => {
-        if (!isDragging && Math.abs(position.x) < 50) {
-          onShowMeaning?.()
-        }
-      }}
+      className="max-w-md mx-auto select-none relative"
       style={{
         transform: `translate(${position.x}px, ${position.y}px) rotate(${position.rotation}deg)`,
         transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97)',
