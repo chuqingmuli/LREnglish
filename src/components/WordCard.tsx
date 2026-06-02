@@ -147,11 +147,7 @@ export function WordCard({
             </div>
           )}
 
-          {!showMeaning && (
-            <div className="mt-12">
-              <p className="text-slate-400 text-lg">点击查看释义</p>
-            </div>
-          )}
+
         </div>
       </div>
 
