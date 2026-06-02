@@ -96,8 +96,8 @@ export function WordCard({
         }}
       >
         <div className="text-white text-3xl font-black">
-          {position.x < -80 ? '✓ 认识' : position.x > 80 ? '✕ 不认识' : ''}
-        </div>
+              {position.x < -80 ? '✓ 认识' : position.x > 80 ? '✕ 不认识' : ''}
+            </div>
       </div>
 
       <div className="bg-white rounded-3xl shadow-2xl p-10 relative overflow-hidden group">
