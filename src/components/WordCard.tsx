@@ -103,18 +103,16 @@ export function WordCard({
         <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
 
         <div className="text-center relative z-10">
-          <div className="flex items-center justify-center gap-4 mb-6">
-            <h2 className="text-5xl font-bold text-slate-800">{word.word}</h2>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleSpeak()
-              }}
-              className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95"
-            >
-              <Volume2 className="w-6 h-6 text-slate-600" />
-            </button>
-          </div>
+          <h2 className="text-5xl font-bold text-slate-800 mb-4">{word.word}</h2>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              handleSpeak()
+            }}
+            className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 mb-6"
+          >
+            <Volume2 className="w-6 h-6 text-slate-600" />
+          </button>
           {word.phonetic && (
             <p className="text-2xl text-slate-500 mb-6">{word.phonetic}</p>
           )}
