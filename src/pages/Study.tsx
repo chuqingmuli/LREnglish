@@ -3,7 +3,7 @@ import { useAppStore } from '../store'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { WordCard } from '../components/WordCard'
-import { ArrowLeft, CheckCircle2, XCircle, Eye } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, XCircle } from 'lucide-react'
 
 export function Study() {
   const { id: wordbookId } = useParams<{ id: string }>()
@@ -243,6 +243,23 @@ export function Study() {
             onKnown={markWordKnown}
             onUnknown={markWordUnknown}
           />
+          
+          <div className="mt-12 grid grid-cols-2 gap-6">
+            <button
+              onClick={markWordUnknown}
+              className="py-5 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-2xl font-bold text-lg shadow-lg hover:from-red-600 hover:to-rose-600 hover:shadow-xl transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-3"
+            >
+              <XCircle className="w-7 h-7" />
+              不认识
+            </button>
+            <button
+              onClick={markWordKnown}
+              className="py-5 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-2xl font-bold text-lg shadow-lg hover:from-emerald-600 hover:to-green-600 hover:shadow-xl transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-3"
+            >
+              <CheckCircle2 className="w-7 h-7" />
+              认识
+            </button>
+          </div>
         </div>
       </div>
     )
