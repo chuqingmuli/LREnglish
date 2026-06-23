@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Mail, ChevronLeft, ChevronRight, Filter, Brain, CheckCircle2, Target, Plus, PlayCircle, BookOpen, RotateCcw, Check } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { Mail, ChevronLeft, ChevronRight, Filter, Brain, CheckCircle2, Target, Plus, PlayCircle, BookOpen, RotateCcw, Check, LogOut, User as UserIcon, ChevronDown } from 'lucide-react'
 import { useAppStore } from '../store'
 import { WordBookCard } from '../components/WordBookCard'
 import { useNavigate } from 'react-router-dom'
@@ -24,15 +24,75 @@ export function Home() {
   const [selectedWordbook, setSelectedWordbook] = useState<WordBook | null>(null)
 
   const {
-    wordbooks, loading, error, currentWordbook, dailyGoal,
+    wordbooks, loading, error, currentWordbook, dailyGoal, currentWords,
     fetchWordbooks, createWordbook, deleteWordbook, selectWordbook, setDailyGoal, setHasSetup,
-    fetchDailyStats, hasSetup,
+    fetchDailyStats, hasSetup, dailyStats, isAuthenticated, checkAuth, user, logout,
   } = useAppStore()
 
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const userMenuRef = useRef<HTMLDivElement>(null)
+
+  // 计算真实的学习进度（限制最大100%）
+  const wordsLearned = dailyStats?.wordsLearned || 0
+  const progressPercent = dailyGoal > 0 ? Math.min(Math.round((wordsLearned / dailyGoal) * 100), 100) : 0
+  const progressWidth = `${progressPercent}%`
+
+  // 词书已学单词数（已掌握+学习中+已认识）
+  const wordbookLearned = currentWords.filter(w => w.status === 'mastered' || w.status === 'learning' || w.status === 'known').length
+  const wordbookProgressPercent = currentWords.length > 0 ? Math.min(Math.round((wordbookLearned / currentWords.length) * 100), 100) : 0
+  const wordbookProgressWidth = `${wordbookProgressPercent}%`
+
   useEffect(() => {
-    fetchWordbooks()
-    fetchDailyStats()
+    // 检查认证状态
+    checkAuth()
   }, [])
+
+  useEffect(() => {
+    // 如果已认证，加载数据
+    if (isAuthenticated) {
+      fetchWordbooks()
+      fetchDailyStats()
+    }
+  }, [isAuthenticated])
+
+  // 如果未认证，跳转到登录页面
+  useEffect(() => {
+    if (!isAuthenticated && !loading) {
+      navigate('/login')
+    }
+  }, [isAuthenticated, loading])
+
+  // 点击外部关闭用户菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false)
+      }
+    }
+
+    if (showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showUserMenu])
+
+  // 定期刷新每日统计
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchDailyStats()
+    }, 5000) // 每5秒刷新一次
+
+    return () => clearInterval(interval)
+  }, [])
+
+  // 当currentWordbook变化时，加载该词书的单词
+  useEffect(() => {
+    if (currentWordbook && currentWords.length === 0) {
+      selectWordbook(currentWordbook.id)
+    }
+  }, [currentWordbook])
 
   // 判断是否需要显示引导
   const needsSetup = !hasSetup || !currentWordbook
@@ -330,11 +390,36 @@ export function Home() {
             <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
               <Mail className="w-4 h-4 text-slate-500" />
             </button>
-            <div className="flex items-center gap-2 px-2 py-1 hover:bg-slate-100 rounded-lg cursor-pointer">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
-                学
-              </div>
-              <span className="text-sm text-slate-700">学习者</span>
+            <div className="relative" ref={userMenuRef}>
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center gap-2 px-2 py-1 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                  {user?.username?.charAt(0)?.toUpperCase() || '用'}
+                </div>
+                <span className="text-sm text-slate-700">{user?.username || '用户'}</span>
+                <ChevronDown className="w-4 h-4 text-slate-400" />
+              </button>
+              {/* 下拉菜单 */}
+              {showUserMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-2 z-50">
+                  <div className="px-4 py-3 border-b border-slate-100">
+                    <p className="text-sm font-medium text-slate-900">{user?.username}</p>
+                    <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      await logout()
+                      navigate('/login')
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    退出登录
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -352,18 +437,38 @@ export function Home() {
                     <span className="text-4xl font-black">{dailyGoal}</span>
                     <span className="text-sm text-blue-200">/ {dailyGoal} 个单词</span>
                   </div>
-                  <p className="text-xs text-blue-200 mb-4">已完成 0%</p>
+                  <p className="text-xs text-blue-200 mb-4">已完成 {progressPercent}%</p>
                   <div className="w-full max-w-md h-1.5 bg-blue-400/30 rounded-full overflow-hidden mb-4">
-                    <div className="h-full bg-white rounded-full" style={{ width: '0%' }} />
+                    <div className="h-full bg-white rounded-full transition-all duration-500" style={{ width: progressWidth }} />
                   </div>
                   {currentWordbook && (
-                    <button
-                      onClick={() => navigate(`/study/${currentWordbook.id}`)}
-                      className="flex items-center gap-2 px-5 py-3 bg-white text-blue-600 rounded-xl text-sm font-medium hover:bg-blue-50 transition-colors"
-                    >
-                      <PlayCircle className="w-4 h-4" />
-                      开始学习
-                    </button>
+                    <div className="space-y-3">
+                      {/* 生词本状态 */}
+                      <div className="bg-white/10 rounded-lg p-3">
+                        <p className="text-sm text-blue-200 mb-1">生词本剩余</p>
+                        <p className="text-lg font-bold">
+                          <span className="text-white">{currentWords.filter(w => w.status === 'unknown').length}</span>
+                          <span className="text-sm text-blue-200"> / {currentWords.length} 个单词</span>
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <button
+                          onClick={() => navigate(`/screen/${currentWordbook.id}`)}
+                          className="flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl text-sm font-medium hover:from-purple-600 hover:to-pink-600 transition-all shadow-md"
+                        >
+                          <Filter className="w-4 h-4" />
+                          开始筛词
+                        </button>
+                        <button
+                          onClick={() => navigate(`/study/${currentWordbook.id}`)}
+                          className="flex items-center justify-center gap-2 px-5 py-3 bg-white text-blue-600 rounded-xl text-sm font-medium hover:bg-blue-50 transition-colors"
+                        >
+                          <PlayCircle className="w-4 h-4" />
+                          开始学习
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
                 <div className="relative">
@@ -392,10 +497,10 @@ export function Home() {
                   </div>
                   <div className="flex-1">
                     <h4 className="text-sm font-bold text-slate-900 mb-1">{currentWordbook.name}</h4>
-                    <p className="text-xs text-slate-500 mb-2">单词数量：{currentWordbook.wordCount || 0}</p>
-                    <p className="text-xs text-slate-500 mb-2">已学单词：0</p>
+                    <p className="text-xs text-slate-500 mb-2">单词数量：{currentWords.length}</p>
+                    <p className="text-xs text-slate-500 mb-2">已学单词：{wordbookLearned}（{wordbookProgressPercent}%）</p>
                     <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: '0%' }} />
+                      <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: wordbookProgressWidth }} />
                     </div>
                   </div>
                   <div className="flex gap-2">

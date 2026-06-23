@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>左右英语 - 快筛背单词应用</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 60px 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            margin-bottom: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+        }
+
+        .logo {
+            font-size: 48px;
+            font-weight: 800;
+            color: #2563eb;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #10b981, #3b82f6);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        .tagline {
+            font-size: 24px;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .badges {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* Section */
+        .section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #2563eb;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 8px;
+            height: 40px;
+            background: linear-gradient(135deg, #10b981, #3b82f6);
+            border-radius: 4px;
+        }
+
+        /* Problem Section */
+        .problem-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .problem-card {
+            background: #f8fafc;
+            padding: 25px;
+            border-radius: 15px;
+            border-left: 4px solid #ef4444;
+        }
+
+        .problem-card h3 {
+            color: #ef4444;
+            font-size: 20px;
+            margin-bottom: 15px;
+        }
+
+        .problem-card p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        /* Solution Section */
+        .solution-flow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .flow-step {
+            flex: 1;
+            min-width: 200px;
+            text-align: center;
+            padding: 30px 20px;
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            border-radius: 15px;
+            position: relative;
+        }
+
+        .flow-step::after {
+            content: '→';
+            position: absolute;
+            right: -15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 24px;
+            color: #3b82f6;
+            font-weight: bold;
+        }
+
+        .flow-step:last-child::after {
+            content: '';
+        }
+
+        .step-number {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #10b981, #3b82f6);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin: 0 auto 15px;
+        }
+
+        .step-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2563eb;
+            margin-bottom: 10px;
+        }
+
+        .step-desc {
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Features */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, #f0f9ff, #ffffff);
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid #e0f2fe;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2);
+            border-color: #3b82f6;
+        }
+
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #10b981, #3b82f6);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+
+        .feature-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2563eb;
+            margin-bottom: 15px;
+        }
+
+        .feature-desc {
+            font-size: 15px;
+            color: #666;
+            line-height: 1.8;
+        }
+
+        /* Demo Section */
+        .demo-container {
+            background: #1e293b;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+
+        .demo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: #0f172a;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .demo-title {
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .demo-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .demo-btn {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .demo-btn.red { background: #ef4444; }
+        .demo-btn.yellow { background: #fbbf24; }
+        .demo-btn.green { background: #10b981; }
+
+        .word-card-demo {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            max-width: 400px;
+            margin: 0 auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .word-card-demo::before {
+            content: '← 左滑：认识';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 30%;
+            background: linear-gradient(90deg, rgba(16, 185, 129, 0.2), transparent);
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding-left: 20px;
+            color: #10b981;
+            font-weight: 600;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .word-card-demo::after {
+            content: '右滑：不认识 →';
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 30%;
+            background: linear-gradient(-90deg, rgba(239, 68, 68, 0.2), transparent);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 20px;
+            color: #ef4444;
+            font-weight: 600;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .word-card-demo:hover::before,
+        .word-card-demo:hover::after {
+            opacity: 1;
+        }
+
+        .demo-word {
+            font-size: 36px;
+            font-weight: 800;
+            color: #1e293b;
+            margin-bottom: 15px;
+        }
+
+        .demo-phonetic {
+            font-size: 18px;
+            color: #64748b;
+            background: #f1f5f9;
+            padding: 8px 15px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .demo-meaning {
+            font-size: 16px;
+            color: #475569;
+            margin-bottom: 15px;
+            line-height: 1.8;
+        }
+
+        .demo-example {
+            font-size: 14px;
+            color: #64748b;
+            background: #f0fdf4;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 3px solid #10b981;
+            margin-top: 20px;
+        }
+
+        .demo-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .demo-action-btn {
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-known {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .btn-unknown {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .btn-show {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: white;
+        }
+
+        .demo-action-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* Target Users */
+        .users-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .user-card {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .user-avatar {
+            width: 80px;
+            height: 80px;
+            background: white;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .user-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #92400e;
+            margin-bottom: 10px;
+        }
+
+        .user-desc {
+            font-size: 14px;
+            color: #78350f;
+        }
+
+        /* Value Section */
+        .value-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+        .value-card {
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+            padding: 30px;
+            border-radius: 15px;
+            border-left: 5px solid #2563eb;
+        }
+
+        .value-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1e40af;
+            margin-bottom: 15px;
+        }
+
+        .value-list {
+            list-style: none;
+        }
+
+        .value-list li {
+            padding: 10px 0;
+            color: #1e3a8a;
+            font-size: 15px;
+            position: relative;
+            padding-left: 25px;
+        }
+
+        .value-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #10b981;
+            font-weight: bold;
+        }
+
+        /* Tech Stack */
+        .tech-grid {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+
+        .tech-item {
+            background: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            border: 2px solid #e5e7eb;
+            font-size: 14px;
+            font-weight: 600;
+            color: #4b5563;
+            transition: all 0.3s;
+        }
+
+        .tech-item:hover {
+            border-color: #3b82f6;
+            color: #2563eb;
+            transform: translateY(-3px);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            margin-top: 40px;
+        }
+
+        .footer-text {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .footer-highlight {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2563eb;
+            margin-bottom: 15px;
+        }
+
+        .contact-btn {
+            display: inline-block;
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #10b981, #3b82f6);
+            color: white;
+            border-radius: 25px;
+            font-size: 18px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .contact-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .logo {
+                font-size: 32px;
+            }
+
+            .section-title {
+                font-size: 24px;
+            }
+
+            .flow-step::after {
+                display: none;
+            }
+
+            .solution-flow {
+                flex-direction: column;
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .section {
+            animation: fadeIn 0.6s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">
+                <div class="logo-icon">LR</div>
+                左右英语
+            </div>
+            <div class="tagline">快筛背单词，高效学习新方式</div>
+            <div class="badges">
+                <span class="badge">学习工作赛道</span>
+                <span class="badge">TRAE Work 创意产物</span>
+                <span class="badge">多平台支持</span>
+            </div>
+        </div>
+
+        <!-- Problem Section -->
+        <div class="section">
+            <div class="section-title">痛点分析</div>
+            <div class="problem-grid">
+                <div class="problem-card">
+                    <h3>效率低下</h3>
+                    <p>传统背单词应用采用"逐个学习"模式，用户被迫重复记忆已掌握的单词，浪费大量时间。</p>
+                </div>
+                <div class="problem-card">
+                    <h3>缺乏个性化</h3>
+                    <p>现有应用无法导入自定义词书，无法满足特定学习需求（如专业词汇、行业术语）。</p>
+                </div>
+                <div class="problem-card">
+                    <h3>记忆不牢固</h3>
+                    <p>学习流程单一，缺少多轮强化机制，导致单词记忆不牢固，容易遗忘。</p>
+                </div>
+                <div class="problem-card">
+                    <h3>体验枯燥</h3>
+                    <p>传统应用交互方式单调，缺乏趣味性，用户难以坚持长期学习。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Solution Section -->
+        <div class="section">
+            <div class="section-title">解决方案：快筛学习法</div>
+            <p style="font-size: 18px; color: #666; margin-bottom: 20px;">
+                左右英语采用创新的"左右滑动快筛法"，让用户快速筛选认识和不认识的单词，
+                形成高效的多轮学习循环，显著提升记忆效率。
+            </p>
+
+            <div class="solution-flow">
+                <div class="flow-step">
+                    <div class="step-number">1</div>
+                    <div class="step-title">快筛模式</div>
+                    <div class="step-desc">左右滑动快速筛选<br/>认识/不认识</div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-number">2</div>
+                    <div class="step-title">生词学习</div>
+                    <div class="step-desc">重点学习不认识的<br/>单词和释义</div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-number">3</div>
+                    <div class="step-title">考察模式</div>
+                    <div class="step-desc">再次筛选当日<br/>学习单词</div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-number">4</div>
+                    <div class="step-title">总复习</div>
+                    <div class="step-desc">当日所有单词<br/>再考一遍</div>
+                </div>
+            </div>
+
+            <!-- Demo -->
+            <div class="demo-container">
+                <div class="demo-header">
+                    <div class="demo-title">快筛演示</div>
+                    <div class="demo-controls">
+                        <div class="demo-btn red"></div>
+                        <div class="demo-btn yellow"></div>
+                        <div class="demo-btn green"></div>
+                    </div>
+                </div>
+
+                <div class="word-card-demo">
+                    <div class="demo-word">innovation</div>
+                    <div class="demo-phonetic">/ˌɪnəˈveɪʃən/</div>
+                    <div class="demo-meaning">
+                        n. 创新，革新；新方法<br/>
+                        the introduction of new things or methods
+                    </div>
+                    <div class="demo-example">
+                        The company is known for its innovation in technology.<br/>
+                        这家公司以其技术创新而闻名。
+                    </div>
+                    <div class="demo-actions">
+                        <button class="demo-action-btn btn-known">✓ 认识</button>
+                        <button class="demo-action-btn btn-show">👁 查看释义</button>
+                        <button class="demo-action-btn btn-unknown">✗ 不认识</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features Section -->
+        <div class="section">
+            <div class="section-title">核心功能</div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">👆</div>
+                    <div class="feature-title">左右滑动快筛</div>
+                    <div class="feature-desc">
+                        创新的手势交互，左滑表示认识，右滑表示不认识，
+                        快速筛选出真正需要学习的生词，效率提升50%以上。
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📚</div>
+                    <div class="feature-title">内置词书</div>
+                    <div class="feature-desc">
+                        预设CET4/6、托福、雅思、GRE、牛津3000等主流词书，
+                        涵盖从初中到研究生各学段的词汇需求。
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📄</div>
+                    <div class="feature-title">自定义导入</div>
+                    <div class="feature-desc">
+                        支持导入TXT、Word、PDF格式的单词列表，
+                        自动识别格式并补充音标、释义、例句。
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔊</div>
+                    <div class="feature-title">发音功能</div>
+                    <div class="feature-desc">
+                        每个单词配备标准发音，支持英式/美式切换，
+                        帮助用户掌握正确的发音方式。
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <div class="feature-title">多轮循环</div>
+                    <div class="feature-desc">
+                        快筛→学习→考察→复习，形成完整记忆闭环，
+                        不认识的单词自动加入下一轮，确保掌握。
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <div class="feature-title">学习统计</div>
+                    <div class="feature-desc">
+                        实时追踪学习时长、单词数、正确率，
+                        学习日历记录每日打卡，可视化掌握进度。
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Target Users Section -->
+        <div class="section">
+            <div class="section-title">目标用户</div>
+            <div class="users-grid">
+                <div class="user-card">
+                    <div class="user-avatar">🎓</div>
+                    <div class="user-title">学生群体</div>
+                    <div class="user-desc">备考CET4/6、托福、雅思、GRE等考试的学生</div>
+                </div>
+                <div class="user-card">
+                    <div class="user-avatar">💼</div>
+                    <div class="user-title">职场人士</div>
+                    <div class="user-desc">需要提升英语能力的白领、外贸从业者</div>
+                </div>
+                <div class="user-card">
+                    <div class="user-avatar">🌟</div>
+                    <div class="user-title">英语爱好者</div>
+                    <div class="user-desc">想要扩充词汇量的终身学习者</div>
+                </div>
+                <div class="user-card">
+                    <div class="user-avatar">🏫</div>
+                    <div class="user-title">教育机构</div>
+                    <div class="user-desc">需要定制词书和班级管理功能的培训机构</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Value Section -->
+        <div class="section">
+            <div class="section-title">价值与意义</div>
+            <div class="value-grid">
+                <div class="value-card">
+                    <div class="value-title">效率提升价值</div>
+                    <ul class="value-list">
+                        <li>快筛模式节省50%以上学习时间</li>
+                        <li>多轮循环强化记忆牢固度</li>
+                        <li>个性化词书满足特定需求</li>
+                        <li>趣味交互提升学习动力</li>
+                    </ul>
+                </div>
+                <div class="value-card">
+                    <div class="value-title">商业价值</div>
+                    <ul class="value-list">
+                        <li>差异化竞争优势明显</li>
+                        <li>会员订阅模式可持续盈利</li>
+                        <li>企业定制服务拓展市场</li>
+                        <li>多平台覆盖扩大用户群</li>
+                    </ul>
+                </div>
+                <div class="value-card">
+                    <div class="value-title">社会价值</div>
+                    <ul class="value-list">
+                        <li>提升国民英语水平</li>
+                        <li>促进国际交流与职业发展</li>
+                        <li>减轻学生备考压力</li>
+                        <li>推动教育技术创新</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tech Stack Section -->
+        <div class="section">
+            <div class="section-title">技术架构</div>
+            <p style="text-align: center; font-size: 18px; color: #666; margin-bottom: 20px;">
+                采用现代化技术栈，确保高性能和良好的用户体验
+            </p>
+            <div class="tech-grid">
+                <div class="tech-item">React 18</div>
+                <div class="tech-item">TypeScript</div>
+                <div class="tech-item">Express</div>
+                <div class="tech-item">SQLite</div>
+                <div class="tech-item">Tailwind CSS</div>
+                <div class="tech-item">Zustand</div>
+                <div class="tech-item">Taro（跨平台）</div>
+                <div class="tech-item">Web Audio API</div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div class="footer-highlight">让背单词变得高效有趣</div>
+            <div class="footer-text">
+                左右英语 - 用创新的快筛模式，重新定义背单词体验
+            </div>
+            <a href="#" class="contact-btn">立即体验</a>
+        </div>
+    </div>
+
+    <script>
+        // Simple interaction demo
+        document.querySelectorAll('.demo-action-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const wordCard = document.querySelector('.word-card-demo');
+                wordCard.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    wordCard.style.transform = 'scale(1)';
+                    // Simulate changing word
+                    const words = [
+                        { word: 'innovation', phonetic: '/ˌɪnəˈveɪʃən/', meaning: 'n. 创新，革新' },
+                        { word: 'collaborate', phonetic: '/kəˈlæbəreɪt/', meaning: 'v. 合作，协作' },
+                        { word: 'sustainable', phonetic: '/səˈsteɪnəbl/', meaning: 'adj. 可持续的' },
+                        { word: 'transform', phonetic: '/trænsˈfɔrm/', meaning: 'v. 改变，转变' }
+                    ];
+                    const randomWord = words[Math.floor(Math.random() * words.length)];
+                    document.querySelector('.demo-word').textContent = randomWord.word;
+                    document.querySelector('.demo-phonetic').textContent = randomWord.phonetic;
+                    document.querySelector('.demo-meaning').innerHTML = randomWord.meaning + '<br/>the introduction of new things or methods';
+                }, 200);
+            });
+        });
+    </script>
+</body>
+</html>

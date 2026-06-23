@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, Play, BookOpen, CheckCircle2, Clock, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Play, BookOpen, CheckCircle2, Clock, AlertCircle, Filter, RotateCcw } from 'lucide-react'
 import { useAppStore } from '../store'
 import { Layout } from '../components/Layout'
+import { batchWordsApi } from '../api'
 
 export function WordBookDetail() {
   const { id } = useParams<{ id: string }>()
@@ -12,7 +13,7 @@ export function WordBookDetail() {
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 50
 
-  const { currentWordbook, currentWords, loading, selectWordbook, addWords, deleteWord } = useAppStore()
+  const { currentWordbook, currentWords, loading, selectWordbook, addWords, deleteWord, updateWord, fetchDailyStats, updateDailyStats } = useAppStore()
 
   useEffect(() => {
     if (id) {
@@ -120,6 +121,7 @@ export function WordBookDetail() {
   const masteredCount = currentWords.filter(w => w.status === 'mastered').length
   const learningCount = currentWords.filter(w => w.status === 'learning').length
   const knownCount = currentWords.filter(w => w.status === 'known').length
+  const unknownCount = currentWords.filter(w => w.status === 'unknown').length
 
   return (
     <Layout>
@@ -141,28 +143,84 @@ export function WordBookDetail() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <div className="bg-white rounded-xl p-4 text-center border border-slate-100">
             <p className="text-2xl font-black text-blue-600">{currentWords.length}</p>
             <p className="text-xs text-slate-400 mt-1">单词总数</p>
           </div>
           <div className="bg-white rounded-xl p-4 text-center border border-slate-100">
-            <p className="text-2xl font-black text-green-600">{masteredCount}</p>
-            <p className="text-xs text-slate-400 mt-1">已掌握</p>
+            <p className="text-2xl font-black text-purple-600">{unknownCount}</p>
+            <p className="text-xs text-slate-400 mt-1">待学习</p>
           </div>
           <div className="bg-white rounded-xl p-4 text-center border border-slate-100">
             <p className="text-2xl font-black text-yellow-600">{learningCount}</p>
             <p className="text-xs text-slate-400 mt-1">学习中</p>
           </div>
           <div className="bg-white rounded-xl p-4 text-center border border-slate-100">
-            <p className="text-2xl font-black text-blue-600">{knownCount}</p>
+            <p className="text-2xl font-black text-green-600">{knownCount}</p>
             <p className="text-xs text-slate-400 mt-1">已认识</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 text-center border border-slate-100">
+            <p className="text-2xl font-black text-emerald-600">{masteredCount}</p>
+            <p className="text-xs text-slate-400 mt-1">已掌握</p>
           </div>
         </div>
 
+        {/* 重置按钮 */}
+        {(knownCount > 0 || learningCount > 0 || masteredCount > 0) && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-amber-800">已筛选 {knownCount} 个认识的单词</p>
+                <p className="text-xs text-amber-600 mt-1">点击重置可以将所有单词状态恢复为未学习，方便重新测试</p>
+              </div>
+              <button
+                onClick={async () => {
+                  if (confirm('确定要重置所有单词状态吗？这将清空所有学习进度。')) {
+                    // 收集所有需要重置的单词ID
+                    const wordIds = currentWords
+                      .filter(w => w.status !== 'unknown')
+                      .map(w => w.id)
+
+                    // 批量更新所有单词状态为 unknown
+                    if (wordIds.length > 0) {
+                      await batchWordsApi.updateStatus(wordIds, 'unknown')
+                    }
+
+                    // 重置今日学习统计
+                    await updateDailyStats({
+                      wordsLearned: 0,
+                      completed: false,
+                    })
+
+                    // 重新加载词书和统计
+                    if (id) {
+                      await selectWordbook(id)
+                    }
+                    await fetchDailyStats()
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" />
+                重置词书
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex gap-3 mb-6">
-          {currentWords.length > 0 && (
+          {currentWords.filter(w => w.status === 'unknown').length > 0 && (
+            <button
+              onClick={() => navigate(`/screen/${id}`)}
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-xl text-sm font-medium transition-all shadow-md"
+            >
+              <Filter className="w-4 h-4" />
+              开始筛词
+            </button>
+          )}
+          {currentWords.filter(w => w.status === 'unknown').length > 0 && (
             <button
               onClick={() => navigate(`/study/${id}`)}
               className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-medium transition-colors"
@@ -178,7 +236,6 @@ export function WordBookDetail() {
             <Plus className="w-4 h-4" />
             添加单词
           </button>
-
         </div>
 
         {/* Word List */}

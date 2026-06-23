@@ -1,14 +1,25 @@
-import type { WordBook, Word, StudySession, DailyStats, ApiResponse } from '../../shared/types'
+import type { WordBook, Word, StudySession, DailyStats, ApiResponse, User } from '../../shared/types'
 
 const API_BASE = '/api'
+
+// 从localStorage获取token
+function getAuthToken(): string | null {
+  return localStorage.getItem('auth_token')
+}
+
+// 添加token到请求头
+function getAuthHeaders(): Record<string, string> {
+  const token = getAuthToken()
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+  }
+}
 
 async function request<T>(url: string, options?: RequestInit): Promise<ApiResponse<T>> {
   try {
     const response = await fetch(`${API_BASE}${url}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
+      headers: getAuthHeaders(),
       ...options,
     })
 
@@ -29,6 +40,16 @@ async function request<T>(url: string, options?: RequestInit): Promise<ApiRespon
       error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
+}
+
+// 认证 API
+export const authApi = {
+  register: (data: { username: string; email: string; password: string }) =>
+    request<{ user: User; token: string }>('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  login: (data: { username: string; password: string }) =>
+    request<{ user: User; token: string }>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  me: () => request<User>('/auth/me'),
 }
 
 // 词书 API
@@ -52,6 +73,21 @@ export const wordsApi = {
   delete: (id: string) => request(`/words/${id}`, { method: 'DELETE' }),
   batchUpdateStatus: (wordIds: string[], status: string) =>
     request('/words/batch-status', { method: 'POST', body: JSON.stringify({ wordIds, status }) }),
+}
+
+// 批量更新单词状态
+export const batchWordsApi = {
+  updateStatus: async (wordIds: string[], status: string): Promise<boolean> => {
+    try {
+      const res = await request('/words/batch-status', {
+        method: 'POST',
+        body: JSON.stringify({ wordIds, status }),
+      })
+      return res.success
+    } catch {
+      return false
+    }
+  },
 }
 
 // 学习会话 API

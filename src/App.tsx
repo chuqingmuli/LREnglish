@@ -2,12 +2,14 @@ import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-route
 import { Home } from "./pages/Home";
 import { WordBookDetail } from "./pages/WordBookDetail";
 import { Study } from "./pages/Study";
+import { Screen } from "./pages/Screen";
+import { Login } from "./pages/Login";
 import { EmptyPage } from "./pages/EmptyPage";
 import { Home as HomeIcon, BookOpen, BarChart3, RotateCcw, Bookmark, Settings, Plus } from 'lucide-react'
 import { useAppStore } from "./store";
 import { WordBookCard } from "./components/WordBookCard";
 import { Empty } from "./components/Empty";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "./components/Layout";
 
 function WordBooksPage() {
@@ -151,8 +153,10 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/wordbooks" element={<WordBooksPage />} />
         <Route path="/wordbook/:id" element={<WordBookDetail />} />
+        <Route path="/screen/:id" element={<Screen />} />
         <Route path="/study/:id" element={<Study />} />
         <Route path="/stats" element={<EmptyPage title="学习统计" icon={BarChart3} />} />
         <Route path="/review" element={<EmptyPage title="复习记录" icon={RotateCcw} />} />

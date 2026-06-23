@@ -1,9 +1,18 @@
+// 用户类型
+export interface User {
+  id: string
+  username: string
+  email: string
+  createdAt: string
+}
+
 // 词书类型
 export interface WordBook {
   id: string
+  userId: string
   name: string
   description?: string
-  type: 'built-in' | 'custom'
+  type: 'built-in' | 'custom' | 'system'
   wordCount: number
   progress: number
   createdAt: string

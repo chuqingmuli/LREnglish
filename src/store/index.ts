@@ -1,10 +1,14 @@
 import { create } from 'zustand'
-import type { WordBook, Word } from '../../shared/types'
-import { wordbooksApi, wordsApi, studyApi, statsApi } from '../api'
+import type { WordBook, Word, User } from '../../shared/types'
+import { wordbooksApi, wordsApi, studyApi, statsApi, authApi } from '../api'
 
 type StudyPhase = 'selection' | 'memory' | 'practice' | 'completed'
 
 interface AppState {
+  // 用户
+  user: User | null
+  isAuthenticated: boolean
+
   // 词书
   wordbooks: WordBook[]
   currentWordbook: WordBook | null
@@ -24,11 +28,16 @@ interface AppState {
 
   // 统计
   dailyStats: any | null
-  
+
   // 设置
   hasSetup: boolean
 
-  // Actions
+  // 用户认证 Actions
+  login: (username: string, password: string, email?: string) => Promise<boolean>
+  logout: () => Promise<void>
+  checkAuth: () => Promise<void>
+
+  // 词书 Actions
   fetchWordbooks: () => Promise<void>
   createWordbook: (name: string, description?: string) => Promise<void>
   deleteWordbook: (id: string) => Promise<void>
@@ -38,9 +47,9 @@ interface AppState {
   updateWord: (wordId: string, data: Partial<Word>) => Promise<void>
   setDailyGoal: (count: number) => void
   setHasSetup: (value: boolean) => void
-  
-  // 新学习流程相关 Actions
-  startNewStudySession: () => Promise<void>
+
+  // 学习流程 Actions
+  startNewStudySession: (wordbookId?: string) => Promise<void>
   proceedToMemory: () => void
   proceedToPractice: () => void
   markWordKnown: () => void
@@ -48,8 +57,8 @@ interface AppState {
   markWordMastered: () => void
   markWordNotMastered: () => void
   toggleMeaning: () => void
-  
-  // 统计相关
+
+  // 统计 Actions
   fetchDailyStats: () => Promise<void>
   updateDailyStats: (data: Partial<any>) => Promise<void>
 
@@ -58,13 +67,16 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
+  user: null,
+  isAuthenticated: false,
+
   wordbooks: [],
   currentWordbook: null,
   currentWords: [],
   loading: false,
   error: null,
 
-  dailyGoal: 30,
+  dailyGoal: parseInt(localStorage.getItem('daily_goal') || '20', 10),
   studyPhase: 'selection',
   todayWords: [],
   currentWordIndex: 0,
@@ -75,6 +87,70 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   dailyStats: null,
   hasSetup: false,
+
+  // 用户认证
+  login: async (username: string, password: string, email?: string): Promise<boolean> => {
+    set({ loading: true, error: null })
+    try {
+      const res = email
+        ? await authApi.register({ username, email, password })
+        : await authApi.login({ username, password })
+
+      if (res.success && res.data) {
+        // 保存token到localStorage
+        localStorage.setItem('auth_token', res.data.token)
+        set({
+          user: res.data.user,
+          isAuthenticated: true,
+          loading: false,
+        })
+        return true
+      } else {
+        set({ error: res.error || '登录失败', loading: false })
+        return false
+      }
+    } catch (err) {
+      set({ error: '登录失败', loading: false })
+      return false
+    }
+  },
+
+  logout: async () => {
+    try {
+      await authApi.logout()
+      localStorage.removeItem('auth_token')
+      set({
+        user: null,
+        isAuthenticated: false,
+        wordbooks: [],
+        currentWordbook: null,
+        currentWords: [],
+      })
+    } catch {
+      // 静默失败
+    }
+  },
+
+  checkAuth: async () => {
+    const token = localStorage.getItem('auth_token')
+    if (!token) {
+      set({ isAuthenticated: false, user: null })
+      return
+    }
+
+    try {
+      const res = await authApi.me()
+      if (res.success && res.data) {
+        set({ user: res.data, isAuthenticated: true })
+      } else {
+        localStorage.removeItem('auth_token')
+        set({ isAuthenticated: false, user: null })
+      }
+    } catch {
+      localStorage.removeItem('auth_token')
+      set({ isAuthenticated: false, user: null })
+    }
+  },
 
   fetchWordbooks: async () => {
     set({ loading: true, error: null })
@@ -198,18 +274,34 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setDailyGoal: (count: number) => {
     set({ dailyGoal: count })
+    // 同步到 localStorage 防止刷新丢失
+    localStorage.setItem('daily_goal', String(count))
   },
 
   setHasSetup: (value: boolean) => {
     set({ hasSetup: value })
   },
 
-  startNewStudySession: async () => {
-    const { currentWords, dailyGoal } = get()
-    const unstudiedWords = currentWords.filter(w => w.status !== 'mastered')
+  startNewStudySession: async (wordbookId?: string) => {
+    // 如果提供了 wordbookId，先获取最新数据
+    let latestWords: any[] = []
+
+    if (wordbookId) {
+      const wordsRes = await wordbooksApi.getWords(wordbookId)
+      if (wordsRes.success && wordsRes.data) {
+        latestWords = wordsRes.data
+        set({ currentWords: latestWords })
+      }
+    } else {
+      latestWords = get().currentWords
+    }
+
+    // 从最新的生词本中抽取
+    const unstudiedWords = latestWords.filter(w => w.status === 'unknown')
     const shuffled = [...unstudiedWords].sort(() => Math.random() - 0.5)
+    const dailyGoal = get().dailyGoal
     const todayWords = shuffled.slice(0, dailyGoal)
-    
+
     set({
       todayWords,
       currentWordIndex: 0,
@@ -222,7 +314,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     try {
       await studyApi.createSession({
-        wordbookId: get().currentWordbook?.id || '',
+        wordbookId: get().currentWordbook?.id || wordbookId || '',
         type: 'daily',
         totalWords: todayWords.length,
       })
@@ -263,8 +355,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       showMeaning: false,
     })
 
+    // 认识的词标记为 'learning'（学习中）
     try {
-      wordsApi.update(word.id, { status: 'known' })
+      wordsApi.update(word.id, { status: 'learning' })
     } catch {
       // 静默失败
     }
@@ -284,11 +377,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       showMeaning: false,
     })
 
-    try {
-      wordsApi.update(word.id, { status: 'learning' })
-    } catch {
-      // 静默失败
-    }
+    // 不认识的词保持 'unknown' 状态（继续留在生词本）
+    // 不需要更新数据库，因为已经是 unknown 了
   },
 
   markWordMastered: () => {

@@ -9,6 +9,7 @@ export function Study() {
   const { id: wordbookId } = useParams<{ id: string }>()
   const navigate = useNavigate()
   
+  // 获取store中的状态和函数
   const {
     currentWordbook,
     dailyGoal,
@@ -28,7 +29,7 @@ export function Study() {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
+
   // 手势相关状态
   const touchStartX = useRef(0)
   const touchEndX = useRef(0)
@@ -43,81 +44,76 @@ export function Study() {
           e.preventDefault()
           toggleMeaning()
         } else if (e.code === 'ArrowLeft') {
-          markWordUnknown()
+          markWordKnown() // 左箭头 = 认识
         } else if (e.code === 'ArrowRight') {
-          markWordKnown()
+          markWordUnknown() // 右箭头 = 不认识
         }
       }
     }
-    
+
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [studyPhase, toggleMeaning, markWordKnown, markWordUnknown])
-  
+
   // 手势处理函数
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX
     touchStartY.current = e.touches[0].clientY
   }
-  
+
   const handleTouchEnd = (e: React.TouchEvent) => {
     touchEndX.current = e.changedTouches[0].clientX
     touchEndY.current = e.changedTouches[0].clientY
     handleSwipe()
   }
-  
+
   const handleSwipe = () => {
     if (studyPhase !== 'practice') return
-    
+
     const minSwipeDistance = 50
     const deltaX = touchEndX.current - touchStartX.current
     const deltaY = touchEndY.current - touchStartY.current
-    
+
     // 确保是水平滑动而不是垂直滑动
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
       if (Math.abs(deltaX) > minSwipeDistance) {
         if (deltaX > 0) {
-          markWordKnown()
+          markWordUnknown() // 右滑 = 不认识
         } else {
-          markWordUnknown()
+          markWordKnown() // 左滑 = 认识
         }
       }
     }
   }
-  
-  useEffect(() => {
-    async function init() {
-      console.log('[Study] 开始初始化...')
-      console.log('[Study] wordbookId:', wordbookId)
-      console.log('[Study] 当前 currentWordbook.id:', currentWordbook?.id)
-      try {
-        if (wordbookId) {
-          // 只有当前词书不是目标词书时才请求
-          if (currentWordbook?.id !== wordbookId) {
-            console.log('[Study] 调用 selectWordbook...')
-            await selectWordbook(wordbookId)
-            console.log('[Study] selectWordbook 完成')
-          }
-          
-          // 只有在未开始学习的情况下才启动新会话
-          console.log('[Study] 当前 studyPhase:', studyPhase)
-          console.log('[Study] 当前 todayWords 长度:', todayWords.length)
-          if (studyPhase === 'selection' || todayWords.length === 0) {
-            console.log('[Study] 调用 startNewStudySession...')
-            await startNewStudySession()
-            console.log('[Study] startNewStudySession 完成')
-          }
-          console.log('[Study] 初始化完成，loading 设置为 false')
-          setLoading(false)
+
+  // 初始化学习会话
+  const initStudySession = async () => {
+    console.log('[Study] 开始初始化...')
+    console.log('[Study] wordbookId:', wordbookId)
+    console.log('[Study] studyPhase:', studyPhase)
+    console.log('[Study] todayWords.length:', todayWords.length)
+    try {
+      if (wordbookId) {
+        // 直接启动学习会话，startNewStudySession 会获取最新数据
+        if (studyPhase === 'selection' || todayWords.length === 0) {
+          await startNewStudySession(wordbookId)
+          console.log('[Study] startNewStudySession 完成')
+          const state = useAppStore.getState()
+          console.log('[Study] 初始化后 todayWords.length:', state.todayWords.length)
+          console.log('[Study] dailyGoal:', state.dailyGoal)
         }
-      } catch (err) {
-        console.error('[Study] 初始化出错:', err)
-        setError(err instanceof Error ? err.message : '未知错误')
         setLoading(false)
       }
+    } catch (err) {
+      console.error('[Study] 初始化出错:', err)
+      setError(err instanceof Error ? err.message : '未知错误')
+      setLoading(false)
     }
-    init()
-  }, [wordbookId, currentWordbook, studyPhase, todayWords.length])
+  }
+
+  useEffect(() => {
+    initStudySession()
+  }, [wordbookId])
 
   // 阶段2：记忆阶段（显示完整单词表）
   const renderMemoryPhase = () => (
@@ -197,26 +193,92 @@ export function Study() {
     const isFinished = currentWordIndex >= todayWords.length
 
     if (isFinished) {
-      return (
-        <div className="p-6 lg:ml-56 flex items-center justify-center min-h-screen">
-          <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center border border-slate-100">
-            <div className="w-20 h-20 bg-gradient-to-br from-emerald-100 to-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+      // 第一轮完成，检查是否有不认识的单词
+      if (unknownWords.length > 0) {
+        // 有不认识的单词，进入第二轮学习
+        return (
+          <div className="p-6 lg:ml-56 flex items-center justify-center min-h-screen">
+            <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center border border-slate-100">
+              <div className="w-20 h-20 bg-gradient-to-br from-orange-100 to-orange-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <XCircle className="w-10 h-10 text-orange-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">第一轮完成！</h2>
+              <div className="text-slate-500 mb-6">
+                <p>认识的单词：{knownWords.length}</p>
+                <p>不认识的单词：{unknownWords.length}</p>
+                <p className="text-sm text-slate-400 mt-2">不认识的单词需要再学习一遍</p>
+              </div>
+              <button
+                onClick={async () => {
+                  // 将不认识的单词重新设置为今日单词，进入第二轮
+                  // 更新每日统计
+                  const learnedCount = knownWords.length
+                  const { updateDailyStats, selectWordbook } = useAppStore.getState()
+                  const currentStats = useAppStore.getState().dailyStats
+                  await updateDailyStats({
+                    wordsLearned: (currentStats?.wordsLearned || 0) + learnedCount,
+                    completed: false,
+                  })
+
+                  // 重新加载词书数据
+                  if (wordbookId) {
+                    await selectWordbook(wordbookId)
+                  }
+
+                  useAppStore.setState({
+                    todayWords: unknownWords,
+                    currentWordIndex: 0,
+                    knownWords: [],
+                    unknownWords: [],
+                    showMeaning: false,
+                  })
+                }}
+                className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-base font-medium transition-all"
+              >
+                进入第二轮学习
+              </button>
             </div>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">今日学习完成！</h2>
-            <div className="text-slate-500 mb-8">
-              <p>认识的单词：{knownWords.length}</p>
-              <p>不认识的单词：{unknownWords.length}</p>
-            </div>
-            <button
-              onClick={() => navigate('/')}
-              className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-base font-medium transition-all"
-            >
-              返回首页
-            </button>
           </div>
-        </div>
-      )
+        )
+      } else {
+        // 全部认识，学习完成
+        return (
+          <div className="p-6 lg:ml-56 flex items-center justify-center min-h-screen">
+            <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center border border-slate-100">
+              <div className="w-20 h-20 bg-gradient-to-br from-emerald-100 to-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">今日学习完成！</h2>
+              <div className="text-slate-500 mb-8">
+                <p>全部掌握！共学习了 {todayWords.length} 个单词</p>
+              </div>
+              <button
+                onClick={async () => {
+                  // 更新每日统计为完成
+                  const learnedCount = knownWords.length + unknownWords.length
+                  const { updateDailyStats } = useAppStore.getState()
+                  const currentStats = useAppStore.getState().dailyStats
+                  await updateDailyStats({
+                    wordsLearned: (currentStats?.wordsLearned || 0) + learnedCount,
+                    completed: true,
+                  })
+
+                  // 重新加载词书数据，确保首页统计更新
+                  if (wordbookId) {
+                    const { selectWordbook } = useAppStore.getState()
+                    await selectWordbook(wordbookId)
+                  }
+
+                  navigate('/')
+                }}
+                className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-base font-medium transition-all"
+              >
+                返回首页
+              </button>
+            </div>
+          </div>
+        )
+      }
     }
 
     return (

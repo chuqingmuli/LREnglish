@@ -18,15 +18,28 @@ const db = new Database(dbPath)
 db.pragma('foreign_keys = ON')
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`)
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS wordbooks (
     id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
     name TEXT NOT NULL,
     description TEXT,
     type TEXT NOT NULL DEFAULT 'custom',
     word_count INTEGER DEFAULT 0,
     progress INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
   )
 `)
 
@@ -72,11 +85,14 @@ db.exec(`
 db.exec(`
   CREATE TABLE IF NOT EXISTS daily_stats (
     id TEXT PRIMARY KEY,
-    date TEXT NOT NULL UNIQUE,
+    user_id TEXT NOT NULL,
+    date TEXT NOT NULL,
     words_learned INTEGER DEFAULT 0,
     study_time INTEGER DEFAULT 0,
     accuracy REAL DEFAULT 0,
-    completed INTEGER DEFAULT 0
+    completed INTEGER DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(user_id, date)
   )
 `)
 
