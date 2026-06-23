@@ -17,6 +17,9 @@ data/db.sqlite
 data/*.sqlite
 data/*.db
 
+# Large dictionary files (can be re-downloaded)
+data/ecdict/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
