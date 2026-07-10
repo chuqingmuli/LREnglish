@@ -3,7 +3,21 @@ export interface User {
   id: string
   username: string
   email: string
+  dailyGoal?: number
   createdAt: string
+}
+
+// 统计概览
+export interface StatsOverview {
+  wordbookCount: number
+  wordCount: number
+  masteredCount: number
+  history: Array<{
+    date: string
+    type: 'learn' | 'forget'
+    wordsLearned: number
+    wordsForget: number
+  }>
 }
 
 // 词书类型

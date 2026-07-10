@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, Play, BookOpen, CheckCircle2, Clock, AlertCircle, Filter, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Play, BookOpen, CheckCircle2, Clock, AlertCircle, Filter, RotateCcw, Loader2 } from 'lucide-react'
 import { useAppStore } from '../store'
 import { Layout } from '../components/Layout'
 import { batchWordsApi } from '../api'
@@ -11,6 +11,7 @@ export function WordBookDetail() {
   const [showAddWord, setShowAddWord] = useState(false)
   const [newWordText, setNewWordText] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [resetting, setResetting] = useState(false)
   const pageSize = 50
 
   const { currentWordbook, currentWords, loading, selectWordbook, addWords, deleteWord, updateWord, fetchDailyStats, updateDailyStats } = useAppStore()
@@ -176,7 +177,11 @@ export function WordBookDetail() {
               </div>
               <button
                 onClick={async () => {
-                  if (confirm('确定要重置所有单词状态吗？这将清空所有学习进度。')) {
+                  if (resetting) return
+                  if (!confirm('确定要重置所有单词状态吗？这将清空所有学习进度。')) return
+
+                  setResetting(true)
+                  try {
                     // 收集所有需要重置的单词ID
                     const wordIds = currentWords
                       .filter(w => w.status !== 'unknown')
@@ -184,7 +189,11 @@ export function WordBookDetail() {
 
                     // 批量更新所有单词状态为 unknown
                     if (wordIds.length > 0) {
-                      await batchWordsApi.updateStatus(wordIds, 'unknown')
+                      const success = await batchWordsApi.updateStatus(wordIds, 'unknown')
+                      if (!success) {
+                        alert('重置失败，请重试')
+                        return
+                      }
                     }
 
                     // 重置今日学习统计
@@ -198,12 +207,27 @@ export function WordBookDetail() {
                       await selectWordbook(id)
                     }
                     await fetchDailyStats()
+                  } catch (error) {
+                    console.error('重置词书失败:', error)
+                    alert('重置失败，请重试')
+                  } finally {
+                    setResetting(false)
                   }
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors"
+                disabled={resetting}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-400 text-white rounded-lg text-sm font-medium transition-colors"
               >
-                <RotateCcw className="w-4 h-4" />
-                重置词书
+                {resetting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    重置中...
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="w-4 h-4" />
+                    重置词书
+                  </>
+                )}
               </button>
             </div>
           </div>

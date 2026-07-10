@@ -23,10 +23,23 @@ db.exec(`
     username TEXT NOT NULL UNIQUE,
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
+    daily_goal INTEGER DEFAULT 20,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `)
+
+// 兼容旧表：如果 users 表没有 daily_goal 字段则添加
+try {
+  const userColumns = db.prepare("PRAGMA table_info(users)").all() as any[]
+  const hasDailyGoal = userColumns.some(col => col.name === 'daily_goal')
+  if (!hasDailyGoal) {
+    db.exec('ALTER TABLE users ADD COLUMN daily_goal INTEGER DEFAULT 20')
+    console.log('✅ 已为 users 表添加 daily_goal 字段')
+  }
+} catch (error) {
+  console.error('检查/添加 daily_goal 字段失败:', error)
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS wordbooks (
@@ -88,6 +101,7 @@ db.exec(`
     user_id TEXT NOT NULL,
     date TEXT NOT NULL,
     words_learned INTEGER DEFAULT 0,
+    words_forget INTEGER DEFAULT 0,
     study_time INTEGER DEFAULT 0,
     accuracy REAL DEFAULT 0,
     completed INTEGER DEFAULT 0,
@@ -95,6 +109,110 @@ db.exec(`
     UNIQUE(user_id, date)
   )
 `)
+
+// 兼容旧表：如果 daily_stats 表没有 words_forget 字段则添加
+try {
+  const statsColumns = db.prepare("PRAGMA table_info(daily_stats)").all() as any[]
+  const hasWordsForget = statsColumns.some(col => col.name === 'words_forget')
+  if (!hasWordsForget) {
+    db.exec('ALTER TABLE daily_stats ADD COLUMN words_forget INTEGER DEFAULT 0')
+    console.log('✅ 已为 daily_stats 表添加 words_forget 字段')
+  }
+} catch (error) {
+  console.error('检查/添加 words_forget 字段失败:', error)
+}
+
+// 兼容旧表：如果 daily_stats 表没有 user_id 字段则添加并迁移数据
+try {
+  const statsColumns = db.prepare("PRAGMA table_info(daily_stats)").all() as any[]
+  const hasUserId = statsColumns.some(col => col.name === 'user_id')
+  if (!hasUserId) {
+    db.exec('ALTER TABLE daily_stats ADD COLUMN user_id TEXT')
+    console.log('✅ 已为 daily_stats 表添加 user_id 字段')
+
+    // 找到第一个用户作为默认关联
+    const firstUser = db.prepare('SELECT id FROM users ORDER BY created_at LIMIT 1').get() as any
+    if (firstUser) {
+      db.prepare('UPDATE daily_stats SET user_id = ? WHERE user_id IS NULL').run(firstUser.id)
+      console.log(`✅ 已将旧 daily_stats 数据迁移到用户 ${firstUser.id}`)
+    }
+
+    // 添加唯一约束（SQLite 不能直接 ADD CONSTRAINT，需要重建表）
+    // 先创建新表
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS daily_stats_new (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        words_learned INTEGER DEFAULT 0,
+        words_forget INTEGER DEFAULT 0,
+        study_time INTEGER DEFAULT 0,
+        accuracy REAL DEFAULT 0,
+        completed INTEGER DEFAULT 0,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        UNIQUE(user_id, date)
+      )
+    `)
+    // 复制数据
+    db.exec(`
+      INSERT INTO daily_stats_new (id, user_id, date, words_learned, words_forget, study_time, accuracy, completed)
+      SELECT id, user_id, date, words_learned, words_forget, study_time, accuracy, completed
+      FROM daily_stats
+      WHERE user_id IS NOT NULL
+    `)
+    // 替换表
+    db.exec('DROP TABLE daily_stats')
+    db.exec('ALTER TABLE daily_stats_new RENAME TO daily_stats')
+    console.log('✅ daily_stats 表迁移完成，已添加 user_id 唯一约束')
+  }
+} catch (error) {
+  console.error('检查/添加 daily_stats user_id 字段失败:', error)
+}
+
+// 用户单词进度表：每个用户对每个单词有独立的学习状态
+db.exec(`
+  CREATE TABLE IF NOT EXISTS user_word_progress (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    word_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'unknown',
+    review_count INTEGER DEFAULT 0,
+    next_review_at DATETIME,
+    last_reviewed_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (word_id) REFERENCES words(id) ON DELETE CASCADE,
+    UNIQUE(user_id, word_id)
+  )
+`)
+
+// 迁移旧数据：把 words 表中的 status/review_count/next_review_at 迁移到 user_word_progress
+try {
+  const progressCount = (db.prepare('SELECT COUNT(*) as count FROM user_word_progress').get() as any).count
+  if (progressCount === 0) {
+    // 表为空，需要迁移旧数据
+    const firstUser = db.prepare('SELECT id FROM users ORDER BY created_at LIMIT 1').get() as any
+    if (firstUser) {
+      const wordsWithStatus = db.prepare(
+        "SELECT id, status, review_count, next_review_at FROM words WHERE status != 'unknown' OR review_count > 0"
+      ).all() as any[]
+
+      if (wordsWithStatus.length > 0) {
+        const insertStmt = db.prepare(`
+          INSERT OR IGNORE INTO user_word_progress (id, user_id, word_id, status, review_count, next_review_at, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `)
+        for (const w of wordsWithStatus) {
+          insertStmt.run(crypto.randomUUID(), firstUser.id, w.id, w.status, w.review_count, w.next_review_at)
+        }
+        console.log(`✅ 已迁移 ${wordsWithStatus.length} 条单词进度到 user_word_progress 表`)
+      }
+    }
+  }
+} catch (error) {
+  console.error('迁移 user_word_progress 数据失败:', error)
+}
 
 function importBuiltInWordbooks() {
   const wordbooksDir = path.join(__dirname, '../../data/wordbooks')

@@ -1,10 +1,19 @@
 import { useEffect, useState, useRef } from 'react'
-import { Mail, ChevronLeft, ChevronRight, Filter, Brain, CheckCircle2, Target, Plus, PlayCircle, BookOpen, RotateCcw, Check, LogOut, User as UserIcon, ChevronDown } from 'lucide-react'
+import { Mail, ChevronLeft, ChevronRight, Filter, Brain, CheckCircle2, Target, Plus, PlayCircle, BookOpen, RotateCcw, Check, LogOut, User as UserIcon, ChevronDown, TrendingUp, TrendingDown } from 'lucide-react'
 import { useAppStore } from '../store'
 import { WordBookCard } from '../components/WordBookCard'
 import { useNavigate } from 'react-router-dom'
 import { Layout } from '../components/Layout'
+import { statsApi } from '../api'
 import type { WordBook } from '../../shared/types'
+
+// 历史数据类型
+type HistoryItem = {
+  date: string
+  wordsLearned: number
+  wordsForget: number
+  type: 'learn' | 'forget' | 'none'
+}
 
 // 引导步骤
 type SetupStep = 'select-wordbook' | 'set-goal' | 'done'
@@ -18,6 +27,7 @@ export function Home() {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear())
   const [selectedDate, setSelectedDate] = useState(new Date().getDate())
   const [tempGoal, setTempGoal] = useState(30)
+  const [history, setHistory] = useState<HistoryItem[]>([])
   
   // 设置引导状态
   const [setupStep, setSetupStep] = useState<SetupStep>('select-wordbook')
@@ -43,8 +53,10 @@ export function Home() {
   const wordbookProgressWidth = `${wordbookProgressPercent}%`
 
   useEffect(() => {
-    // 检查认证状态
-    checkAuth()
+    // 只在未认证时检查认证状态，避免覆盖刚修改的设置
+    if (!isAuthenticated) {
+      checkAuth()
+    }
   }, [])
 
   useEffect(() => {
@@ -52,8 +64,34 @@ export function Home() {
     if (isAuthenticated) {
       fetchWordbooks()
       fetchDailyStats()
+      // 加载历史数据
+      loadHistory()
     }
   }, [isAuthenticated])
+
+  // 定期刷新数据（包括历史数据）
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (isAuthenticated) {
+        fetchDailyStats()
+        loadHistory()
+      }
+    }, 5000) // 每5秒刷新一次
+
+    return () => clearInterval(interval)
+  }, [isAuthenticated])
+
+  // 加载历史数据
+  const loadHistory = async () => {
+    try {
+      const res = await statsApi.getOverview()
+      if (res.success && res.data?.history) {
+        setHistory(res.data.history)
+      }
+    } catch {
+      // 静默失败
+    }
+  }
 
   // 如果未认证，跳转到登录页面
   useEffect(() => {
@@ -94,8 +132,8 @@ export function Home() {
     }
   }, [currentWordbook])
 
-  // 判断是否需要显示引导
-  const needsSetup = !hasSetup || !currentWordbook
+  // 判断是否需要显示引导：没有当前词书时才需要
+  const needsSetup = !currentWordbook
 
   const handleCreateWordbook = async () => {
     if (!newName.trim()) return
@@ -612,7 +650,7 @@ export function Home() {
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">正确率</p>
-                      <p className="text-lg font-black text-slate-900">0%</p>
+                      <p className="text-lg font-black text-slate-900">{dailyStats?.accuracy || 0}%</p>
                     </div>
                   </div>
                 </div>
@@ -666,18 +704,46 @@ export function Home() {
                 {Array.from({ length: 42 }).map((_, idx) => {
                   const dayNum = idx - firstDay + 1
                   const isCurrentMonth = dayNum >= 1 && dayNum <= daysInMonth
+                  const dateStr = isCurrentMonth 
+                    ? `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}` 
+                    : ''
+                  
+                  // 从历史数据中找到当天的记录
+                  const dayHistory = history.find(h => h.date === dateStr)
+                  const isToday = isCurrentMonth && dayNum === today.getDate() && currentMonth === today.getMonth() + 1 && currentYear === today.getFullYear()
+                  
                   return (
                     <button
                       key={idx}
-                      className={`aspect-square text-[11px] rounded-lg flex items-center justify-center transition-colors
-                        ${isCurrentMonth && dayNum === today.getDate() && currentMonth === today.getMonth() + 1 && currentYear === today.getFullYear()
+                      className={`aspect-square text-[11px] rounded-lg flex flex-col items-center justify-center transition-colors relative
+                        ${isToday
                           ? 'bg-emerald-100 text-emerald-700 font-medium'
                           : isCurrentMonth
-                            ? 'text-slate-700 hover:bg-slate-100'
+                            ? dayHistory?.type === 'learn'
+                              ? 'bg-red-50 text-red-700'
+                              : dayHistory?.type === 'forget'
+                                ? 'bg-green-50 text-green-700'
+                                : 'text-slate-700 hover:bg-slate-100'
                             : 'text-slate-300'
                         }`}
                     >
-                      {isCurrentMonth ? dayNum : ''}
+                      {isCurrentMonth ? (
+                        <>
+                          <span>{dayNum}</span>
+                          {dayHistory?.type === 'learn' && (
+                            <span className="text-[9px] text-red-500 flex items-center">
+                              <TrendingUp className="w-2.5 h-2.5" />
+                              +{dayHistory.wordsLearned}
+                            </span>
+                          )}
+                          {dayHistory?.type === 'forget' && dayHistory.wordsForget > 0 && (
+                            <span className="text-[9px] text-green-500 flex items-center">
+                              <TrendingDown className="w-2.5 h-2.5" />
+                              -{dayHistory.wordsForget}
+                            </span>
+                          )}
+                        </>
+                      ) : ''}
                     </button>
                   )
                 })}
@@ -689,38 +755,65 @@ export function Home() {
               <h3 className="text-sm font-bold text-slate-900 mb-4">掌握进度</h3>
               <div className="flex items-center gap-4">
                 {/* Circular Progress */}
-                <div className="relative w-20 h-20">
-                  <svg className="w-full h-full transform -rotate-90">
-                    <circle cx="40" cy="40" r="32" stroke="#e5e7eb" strokeWidth="6" fill="none" />
-                    <circle cx="40" cy="40" r="32" stroke="#3b82f6" strokeWidth="6" fill="none" strokeLinecap="round" strokeDasharray="201" strokeDashoffset="201" />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-base font-bold text-slate-900">0%</span>
-                  </div>
-                </div>
-                <div className="flex-1 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                      <span className="text-[11px] text-slate-600">已掌握</span>
-                    </div>
-                    <span className="text-[11px] text-slate-700">0（0%）</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full bg-blue-500" />
-                      <span className="text-[11px] text-slate-600">学习中</span>
-                    </div>
-                    <span className="text-[11px] text-slate-700">0（0%）</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full bg-slate-300" />
-                      <span className="text-[11px] text-slate-600">未学习</span>
-                    </div>
-                    <span className="text-[11px] text-slate-700">{wordbooks.reduce((sum, wb) => sum + (wb.wordCount || 0), 0)}（100%）</span>
-                  </div>
-                </div>
+                {(() => {
+                  // 计算所有词书的统计数据
+                  const totalWords = wordbooks.reduce((sum, wb) => sum + (wb.wordCount || 0), 0)
+                  // 已掌握 = mastered
+                  // 学习中 = learning
+                  // 未学习 = unknown
+                  const mastered = wordbooks.filter(w => w.progress !== undefined).reduce((sum, wb) => {
+                    // progress 字段表示掌握百分比，反推掌握数
+                    return sum + Math.round(((wb.progress || 0) / 100) * (wb.wordCount || 0))
+                  }, 0)
+                  const unknown = totalWords - mastered
+                  const percent = totalWords > 0 ? Math.min(Math.round((mastered / totalWords) * 100), 100) : 0
+                  const circumference = 2 * Math.PI * 32
+                  const offset = circumference - (percent / 100) * circumference
+
+                  return (
+                    <>
+                      <div className="relative w-20 h-20">
+                        <svg className="w-full h-full transform -rotate-90">
+                          <circle cx="40" cy="40" r="32" stroke="#e5e7eb" strokeWidth="6" fill="none" />
+                          <circle
+                            cx="40" cy="40" r="32"
+                            stroke="#3b82f6" strokeWidth="6" fill="none"
+                            strokeLinecap="round"
+                            strokeDasharray={circumference}
+                            strokeDashoffset={offset}
+                            style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-base font-bold text-slate-900">{percent}%</span>
+                        </div>
+                      </div>
+                      <div className="flex-1 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                            <span className="text-[11px] text-slate-600">已掌握</span>
+                          </div>
+                          <span className="text-[11px] text-slate-700">{mastered}（{percent}%）</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-blue-500" />
+                            <span className="text-[11px] text-slate-600">学习中</span>
+                          </div>
+                          <span className="text-[11px] text-slate-700">0（0%）</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-slate-300" />
+                            <span className="text-[11px] text-slate-600">未学习</span>
+                          </div>
+                          <span className="text-[11px] text-slate-700">{unknown}（{totalWords > 0 ? Math.round((unknown / totalWords) * 100) : 0}%）</span>
+                        </div>
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             </div>
           </div>

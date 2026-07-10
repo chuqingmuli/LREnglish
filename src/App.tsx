@@ -5,7 +5,8 @@ import { Study } from "./pages/Study";
 import { Screen } from "./pages/Screen";
 import { Login } from "./pages/Login";
 import { EmptyPage } from "./pages/EmptyPage";
-import { Home as HomeIcon, BookOpen, BarChart3, RotateCcw, Bookmark, Settings, Plus } from 'lucide-react'
+import { Settings } from "./pages/Settings";
+import { Home as HomeIcon, BookOpen, BarChart3, RotateCcw, Bookmark, Settings as SettingsIcon, Plus } from 'lucide-react'
 import { useAppStore } from "./store";
 import { WordBookCard } from "./components/WordBookCard";
 import { Empty } from "./components/Empty";
@@ -161,7 +162,7 @@ export default function App() {
         <Route path="/stats" element={<EmptyPage title="学习统计" icon={BarChart3} />} />
         <Route path="/review" element={<EmptyPage title="复习记录" icon={RotateCcw} />} />
         <Route path="/words" element={<EmptyPage title="生词本" icon={Bookmark} />} />
-        <Route path="/settings" element={<EmptyPage title="设置" icon={Settings} />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </Router>
   );

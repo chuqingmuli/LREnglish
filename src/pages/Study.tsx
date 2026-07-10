@@ -3,7 +3,18 @@ import { useAppStore } from '../store'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { WordCard } from '../components/WordCard'
-import { ArrowLeft, CheckCircle2, XCircle, Eye } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, XCircle, Eye, Volume2 } from 'lucide-react'
+
+// 发音函数
+const speak = (word: string) => {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(word)
+    utterance.lang = 'en-US'
+    utterance.rate = 0.9
+    window.speechSynthesis.speak(utterance)
+  }
+}
 
 export function Study() {
   const { id: wordbookId } = useParams<{ id: string }>()
@@ -148,6 +159,13 @@ export function Study() {
                           {word.phonetic}
                         </span>
                       )}
+                      <button
+                        onClick={() => speak(word.word)}
+                        className="p-2 text-blue-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="播放发音"
+                      >
+                        <Volume2 className="w-5 h-5" />
+                      </button>
                     </div>
                     
                     {word.meaningEn && (
@@ -159,7 +177,7 @@ export function Study() {
                     
                     <div className="mb-3">
                       <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">中文释义</h4>
-                      <p className="text-slate-700">{word.meaningCn || word.meaning}</p>
+                      <p className="text-slate-700">{word.meaningCn}</p>
                     </div>
                     
                     {word.example && (
@@ -213,10 +231,13 @@ export function Study() {
                   // 将不认识的单词重新设置为今日单词，进入第二轮
                   // 更新每日统计
                   const learnedCount = knownWords.length
+                  // 第一轮正确率
+                  const firstRoundAccuracy = todayWords.length > 0 ? Math.round((knownWords.length / todayWords.length) * 100) : 0
                   const { updateDailyStats, selectWordbook } = useAppStore.getState()
                   const currentStats = useAppStore.getState().dailyStats
                   await updateDailyStats({
                     wordsLearned: (currentStats?.wordsLearned || 0) + learnedCount,
+                    accuracy: firstRoundAccuracy,
                     completed: false,
                   })
 
@@ -256,10 +277,13 @@ export function Study() {
                 onClick={async () => {
                   // 更新每日统计为完成
                   const learnedCount = knownWords.length + unknownWords.length
+                  // 计算正确率：认识的单词数 / 总学习单词数
+                  const accuracy = learnedCount > 0 ? Math.round((knownWords.length / learnedCount) * 100) : 0
                   const { updateDailyStats } = useAppStore.getState()
                   const currentStats = useAppStore.getState().dailyStats
                   await updateDailyStats({
                     wordsLearned: (currentStats?.wordsLearned || 0) + learnedCount,
+                    accuracy,
                     completed: true,
                   })
 

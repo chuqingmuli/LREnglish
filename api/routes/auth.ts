@@ -7,6 +7,17 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import db from '../db/index.js'
 
+// 扩展 Express Request 类型，支持 req.user
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: {
+      id: string
+      username: string
+      email: string
+    }
+  }
+}
+
 const router = Router()
 
 // JWT密钥（生产环境应该从环境变量中获取）
@@ -192,6 +203,7 @@ router.get('/me', async (req: Request, res: Response): Promise<void> => {
         id: user.id,
         username: user.username,
         email: user.email,
+        dailyGoal: user.daily_goal || 20,
         createdAt: user.created_at,
       },
     })
@@ -204,6 +216,158 @@ router.get('/me', async (req: Request, res: Response): Promise<void> => {
 /**
  * 验证token中间件（供其他路由使用）
  */
+/**
+ * 修改密码
+ * PUT /api/auth/change-password
+ */
+router.put('/change-password', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { currentPassword, newPassword } = req.body
+
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ success: false, error: '当前密码和新密码都是必填项' })
+      return
+    }
+
+    if (newPassword.length < 6) {
+      res.status(400).json({ success: false, error: '新密码长度至少6个字符' })
+      return
+    }
+
+    const authHeader = req.headers.authorization
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ success: false, error: '未提供认证token' })
+      return
+    }
+
+    const token = authHeader.substring(7)
+    const decoded = jwt.verify(token, JWT_SECRET) as any
+
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.userId) as any
+
+    if (!user) {
+      res.status(401).json({ success: false, error: '用户不存在' })
+      return
+    }
+
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password_hash)
+    if (!isValidPassword) {
+      res.status(401).json({ success: false, error: '当前密码错误' })
+      return
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 10)
+
+    db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(
+      newPasswordHash,
+      new Date().toISOString(),
+      user.id
+    )
+
+    res.json({ success: true, message: '密码修改成功' })
+  } catch (error) {
+    console.error('修改密码错误:', error)
+    res.status(500).json({ success: false, error: '修改密码失败' })
+  }
+})
+
+/**
+ * 更新用户信息
+ * PUT /api/auth/profile
+ */
+router.put('/profile', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { username, email, dailyGoal } = req.body
+
+    const authHeader = req.headers.authorization
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ success: false, error: '未提供认证token' })
+      return
+    }
+
+    const token = authHeader.substring(7)
+    const decoded = jwt.verify(token, JWT_SECRET) as any
+
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.userId) as any
+
+    if (!user) {
+      res.status(401).json({ success: false, error: '用户不存在' })
+      return
+    }
+
+    const updates: any = { updated_at: new Date().toISOString() }
+    const updateFields: string[] = []
+    const updateValues: any[] = []
+
+    if (username) {
+      if (username.length < 3 || username.length > 20) {
+        res.status(400).json({ success: false, error: '用户名长度必须在3-20个字符之间' })
+        return
+      }
+
+      const existingUsername = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(username, user.id)
+      if (existingUsername) {
+        res.status(400).json({ success: false, error: '用户名已被使用' })
+        return
+      }
+
+      updateFields.push('username = ?')
+      updateValues.push(username)
+    }
+
+    if (email) {
+      const existingEmail = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(email, user.id)
+      if (existingEmail) {
+        res.status(400).json({ success: false, error: '邮箱已被注册' })
+        return
+      }
+
+      updateFields.push('email = ?')
+      updateValues.push(email)
+    }
+
+    if (dailyGoal !== undefined) {
+      if (dailyGoal < 1 || dailyGoal > 200) {
+        res.status(400).json({ success: false, error: '每日目标必须在1-200之间' })
+        return
+      }
+
+      updateFields.push('daily_goal = ?')
+      updateValues.push(dailyGoal)
+    }
+
+    if (updateFields.length === 0) {
+      res.status(400).json({ success: false, error: '没有需要更新的字段' })
+      return
+    }
+
+    updateValues.push(user.id)
+
+    db.prepare(`UPDATE users SET ${updateFields.join(', ')}, updated_at = ? WHERE id = ?`).run(
+      ...updateValues,
+      new Date().toISOString(),
+      user.id
+    )
+
+    const updatedUser = db.prepare('SELECT id, username, email, daily_goal, created_at FROM users WHERE id = ?').get(user.id) as any
+
+    res.json({
+      success: true,
+      data: {
+        id: updatedUser.id,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        dailyGoal: updatedUser.daily_goal,
+        createdAt: updatedUser.created_at,
+      },
+      message: '用户信息更新成功',
+    })
+  } catch (error) {
+    console.error('更新用户信息错误:', error)
+    res.status(500).json({ success: false, error: '更新用户信息失败' })
+  }
+})
+
 export function authMiddleware(req: Request, res: Response, next: any) {
   try {
     const authHeader = req.headers.authorization

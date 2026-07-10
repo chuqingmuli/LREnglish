@@ -1,15 +1,22 @@
 import express, { type Request, type Response } from 'express'
 import db from '../db/index.js'
 import type { Word } from '../../shared/types.js'
+import { authMiddleware } from './auth.js'
 
 const router = express.Router()
 
-// 更新单词
+// 所有单词路由都需要认证
+router.use(authMiddleware)
+
+// 更新单词（内容+用户学习状态）
 router.put('/:id', (req: Request, res: Response) => {
   try {
+    const userId = (req as any).user.id
     const { word, phonetic, partOfSpeech, meaningCn, meaningEn, example, status } = req.body
+    const wordId = req.params.id
     const now = new Date().toISOString()
 
+    // 更新单词的基本信息（不包含 status，status 存在 user_word_progress 中）
     const stmt = db.prepare(
       `UPDATE words 
        SET word = COALESCE(?, word), 
@@ -17,19 +24,45 @@ router.put('/:id', (req: Request, res: Response) => {
            part_of_speech = COALESCE(?, part_of_speech), 
            meaning_cn = COALESCE(?, meaning_cn), 
            meaning_en = COALESCE(?, meaning_en), 
-           example = COALESCE(?, example), 
-           status = COALESCE(?, status)
+           example = COALESCE(?, example)
        WHERE id = ?`
     )
-    const result = stmt.run(word, phonetic, partOfSpeech, meaningCn, meaningEn, example, status, req.params.id)
+    const result = stmt.run(word, phonetic, partOfSpeech, meaningCn, meaningEn, example, wordId)
 
     if (result.changes === 0) {
       return res.status(404).json({ success: false, error: 'Word not found' })
     }
 
-    // 获取更新后的单词
-    const getStmt = db.prepare('SELECT * FROM words WHERE id = ?')
-    const row = getStmt.get(req.params.id) as any
+    // 如果传了 status，更新用户的学习进度
+    if (status) {
+      const existingProgress = db.prepare(
+        'SELECT id FROM user_word_progress WHERE user_id = ? AND word_id = ?'
+      ).get(userId, wordId) as any
+
+      if (existingProgress) {
+        db.prepare(
+          `UPDATE user_word_progress SET status = ?, review_count = review_count + 1, last_reviewed_at = ?, updated_at = ?
+           WHERE user_id = ? AND word_id = ?`
+        ).run(status, now, now, userId, wordId)
+      } else {
+        db.prepare(
+          `INSERT INTO user_word_progress (id, user_id, word_id, status, review_count, last_reviewed_at, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 1, ?, ?, ?)`
+        ).run(crypto.randomUUID(), userId, wordId, status, now, now, now)
+      }
+    }
+
+    // 获取更新后的单词（含用户进度）
+    const getStmt = db.prepare(`
+      SELECT w.*,
+        COALESCE(uwp.status, 'unknown') as user_status,
+        COALESCE(uwp.review_count, 0) as user_review_count,
+        uwp.next_review_at as user_next_review_at
+      FROM words w
+      LEFT JOIN user_word_progress uwp ON uwp.word_id = w.id AND uwp.user_id = ?
+      WHERE w.id = ?
+    `)
+    const row = getStmt.get(userId, wordId) as any
     const updatedWord: Word = {
       id: row.id,
       wordbookId: row.wordbook_id,
@@ -40,9 +73,9 @@ router.put('/:id', (req: Request, res: Response) => {
       meaningEn: row.meaning_en,
       example: row.example,
       audioUrl: row.audio_url,
-      status: row.status,
-      reviewCount: row.review_count,
-      nextReviewAt: row.next_review_at,
+      status: row.user_status,
+      reviewCount: row.user_review_count,
+      nextReviewAt: row.user_next_review_at,
       createdAt: row.created_at,
     }
 
@@ -88,14 +121,29 @@ router.delete('/:id', (req: Request, res: Response) => {
   }
 })
 
-// 批量更新单词状态
+// 批量更新单词状态（写入用户进度表）
 router.post('/batch-status', (req: Request, res: Response) => {
   try {
+    const userId = (req as any).user.id
     const { wordIds, status } = req.body
+    const now = new Date().toISOString()
 
     for (const wordId of wordIds) {
-      const stmt = db.prepare('UPDATE words SET status = ?, review_count = review_count + 1 WHERE id = ?')
-      stmt.run(status, wordId)
+      const existingProgress = db.prepare(
+        'SELECT id FROM user_word_progress WHERE user_id = ? AND word_id = ?'
+      ).get(userId, wordId) as any
+
+      if (existingProgress) {
+        db.prepare(
+          `UPDATE user_word_progress SET status = ?, review_count = review_count + 1, updated_at = ?
+           WHERE user_id = ? AND word_id = ?`
+        ).run(status, now, userId, wordId)
+      } else {
+        db.prepare(
+          `INSERT INTO user_word_progress (id, user_id, word_id, status, review_count, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 1, ?, ?)`
+        ).run(crypto.randomUUID(), userId, wordId, status, now, now)
+      }
     }
 
     res.json({ success: true, message: 'Words updated' })

@@ -36,6 +36,8 @@ interface AppState {
   login: (username: string, password: string, email?: string) => Promise<boolean>
   logout: () => Promise<void>
   checkAuth: () => Promise<void>
+  changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>
+  updateProfile: (data: { username?: string; email?: string }) => Promise<boolean>
 
   // 词书 Actions
   fetchWordbooks: () => Promise<void>
@@ -126,6 +128,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         currentWordbook: null,
         currentWords: [],
       })
+      // 保留 current_wordbook_id，重新登录后自动恢复
     } catch {
       // 静默失败
     }
@@ -141,7 +144,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const res = await authApi.me()
       if (res.success && res.data) {
-        set({ user: res.data, isAuthenticated: true })
+        set({
+          user: res.data,
+          isAuthenticated: true,
+          // 同步服务器端的 dailyGoal 到本地
+          dailyGoal: res.data.dailyGoal || parseInt(localStorage.getItem('daily_goal') || '20', 10),
+        })
+        // 同步到 localStorage 防止刷新丢失
+        if (res.data.dailyGoal) {
+          localStorage.setItem('daily_goal', String(res.data.dailyGoal))
+        }
       } else {
         localStorage.removeItem('auth_token')
         set({ isAuthenticated: false, user: null })
@@ -152,12 +164,58 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  changePassword: async (currentPassword: string, newPassword: string): Promise<boolean> => {
+    try {
+      const res = await authApi.changePassword({ currentPassword, newPassword })
+      if (res.success) {
+        return true
+      } else {
+        set({ error: res.error || '修改密码失败' })
+        return false
+      }
+    } catch {
+      set({ error: '修改密码失败' })
+      return false
+    }
+  },
+
+  updateProfile: async (data: { username?: string; email?: string; dailyGoal?: number }): Promise<boolean> => {
+    try {
+      const res = await authApi.updateProfile(data)
+      if (res.success && res.data) {
+        set({ user: res.data.user })
+        return true
+      } else {
+        set({ error: res.error || '更新用户信息失败' })
+        return false
+      }
+    } catch {
+      set({ error: '更新用户信息失败' })
+      return false
+    }
+  },
+
   fetchWordbooks: async () => {
     set({ loading: true, error: null })
     try {
       const res = await wordbooksApi.getAll()
       if (res.success) {
         set({ wordbooks: res.data || [] })
+
+        // 尝试恢复上次选择的词书
+        const savedWordbookId = localStorage.getItem('current_wordbook_id')
+        if (savedWordbookId) {
+          const wordbooks = res.data || []
+          const exists = wordbooks.some((w: any) => w.id === savedWordbookId)
+          if (exists) {
+            // 词书还存在，自动恢复
+            const { selectWordbook } = useAppStore.getState()
+            await selectWordbook(savedWordbookId)
+          } else {
+            // 词书已删除，清除保存的 ID
+            localStorage.removeItem('current_wordbook_id')
+          }
+        }
       } else {
         set({ error: res.error || 'Failed to fetch wordbooks' })
       }
@@ -210,6 +268,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           currentWordbook: wordbookRes.data || null,
           currentWords: wordsRes.data || [],
         })
+        // 保存当前词书 ID 到 localStorage，重新登录后自动恢复
+        localStorage.setItem('current_wordbook_id', id)
       } else {
         set({ error: wordbookRes.error || wordsRes.error || 'Failed to fetch wordbook' })
       }
@@ -276,6 +336,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ dailyGoal: count })
     // 同步到 localStorage 防止刷新丢失
     localStorage.setItem('daily_goal', String(count))
+    // 异步同步到服务器（不阻塞 UI）
+    if (useAppStore.getState().isAuthenticated) {
+      authApi.updateProfile({ dailyGoal: count }).catch(err => {
+        console.error('同步每日目标到服务器失败:', err)
+      })
+    }
   },
 
   setHasSetup: (value: boolean) => {

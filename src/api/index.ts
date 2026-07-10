@@ -1,6 +1,7 @@
-import type { WordBook, Word, StudySession, DailyStats, ApiResponse, User } from '../../shared/types'
+import type { WordBook, Word, StudySession, DailyStats, ApiResponse, User, StatsOverview } from '../../shared/types'
 
-const API_BASE = '/api'
+// 部署时通过环境变量 VITE_API_BASE 指向后端地址，本地开发用 /api（Vite proxy 转发）
+const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
 // 从localStorage获取token
 function getAuthToken(): string | null {
@@ -50,6 +51,10 @@ export const authApi = {
     request<{ user: User; token: string }>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request<User>('/auth/me'),
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    request('/auth/change-password', { method: 'PUT', body: JSON.stringify(data) }),
+  updateProfile: (data: { username?: string; email?: string; dailyGoal?: number }) =>
+    request<{ user: User }>('/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),
 }
 
 // 词书 API
@@ -103,5 +108,5 @@ export const statsApi = {
   getDaily: (date?: string) => request<DailyStats>(`/stats/daily${date ? `?date=${date}` : ''}`),
   updateDaily: (data: Partial<DailyStats>) =>
     request<DailyStats>('/stats/daily', { method: 'POST', body: JSON.stringify(data) }),
-  getOverview: () => request('/stats/overview'),
+  getOverview: () => request<StatsOverview>('/stats/overview'),
 }

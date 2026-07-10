@@ -1,23 +1,43 @@
 import express, { type Request, type Response } from 'express'
 import db from '../db/index.js'
 import type { WordBook, Word } from '../../shared/types.js'
+import { authMiddleware } from './auth.js'
 
 const router = express.Router()
 
-// 获取所有词书
+// 所有词书路由都需要认证
+router.use(authMiddleware)
+
+// 获取所有词书（含用户进度）
 router.get('/', (req: Request, res: Response) => {
   try {
+    const userId = (req as any).user.id
     const stmt = db.prepare('SELECT * FROM wordbooks ORDER BY updated_at DESC')
-    const wordbooks = stmt.all().map((row: any) => ({
-      id: row.id,
-      name: row.name,
-      description: row.description,
-      type: row.type,
-      wordCount: row.word_count,
-      progress: row.progress,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    })) as WordBook[]
+    const wordbooks = stmt.all().map((row: any) => {
+      // 计算用户对该词书的掌握进度
+      const totalCount = row.word_count || 0
+      let learnedCount = 0
+      if (totalCount > 0) {
+        const progressRow = db.prepare(`
+          SELECT COUNT(*) as count FROM user_word_progress uwp
+          JOIN words w ON w.id = uwp.word_id
+          WHERE uwp.user_id = ? AND w.wordbook_id = ? AND uwp.status IN ('learning', 'known', 'mastered')
+        `).get(userId, row.id) as any
+        learnedCount = progressRow?.count || 0
+      }
+      const progress = totalCount > 0 ? Math.round((learnedCount / totalCount) * 100) : 0
+
+      return {
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        type: row.type,
+        wordCount: row.word_count,
+        progress: Math.min(progress, 100),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }
+    }) as WordBook[]
 
     res.json({ success: true, data: wordbooks })
   } catch (error) {
@@ -39,6 +59,7 @@ router.post('/', (req: Request, res: Response) => {
 
     const newWordbook: WordBook = {
       id,
+      userId: (req as any).user?.id || '',
       name,
       description,
       type: type as 'built-in' | 'custom',
@@ -66,6 +87,7 @@ router.get('/:id', (req: Request, res: Response) => {
 
     const wordbook: WordBook = {
       id: row.id,
+      userId: row.user_id || '',
       name: row.name,
       description: row.description,
       type: row.type,
@@ -118,11 +140,22 @@ router.delete('/:id', (req: Request, res: Response) => {
   }
 })
 
-// 获取词书的单词
+// 获取词书的单词（含用户学习进度）
 router.get('/:id/words', (req: Request, res: Response) => {
   try {
-    const stmt = db.prepare('SELECT * FROM words WHERE wordbook_id = ? ORDER BY created_at')
-    const words = stmt.all(req.params.id).map((row: any) => ({
+    const userId = (req as any).user.id
+    const stmt = db.prepare(`
+      SELECT w.*,
+        COALESCE(uwp.status, 'unknown') as user_status,
+        COALESCE(uwp.review_count, 0) as user_review_count,
+        uwp.next_review_at as user_next_review_at,
+        uwp.last_reviewed_at as user_last_reviewed_at
+      FROM words w
+      LEFT JOIN user_word_progress uwp ON uwp.word_id = w.id AND uwp.user_id = ?
+      WHERE w.wordbook_id = ?
+      ORDER BY w.created_at
+    `)
+    const words = stmt.all(userId, req.params.id).map((row: any) => ({
       id: row.id,
       wordbookId: row.wordbook_id,
       word: row.word,
@@ -132,9 +165,10 @@ router.get('/:id/words', (req: Request, res: Response) => {
       meaningEn: row.meaning_en,
       example: row.example,
       audioUrl: row.audio_url,
-      status: row.status,
-      reviewCount: row.review_count,
-      nextReviewAt: row.next_review_at,
+      status: row.user_status,
+      reviewCount: row.user_review_count,
+      nextReviewAt: row.user_next_review_at,
+      lastReviewedAt: row.user_last_reviewed_at,
       createdAt: row.created_at,
     })) as Word[]
 
