@@ -1,22 +1,18 @@
 /**
- * local server entry file, for local development
+ * Server entry file - works for both local development and production
  */
 import app from './app.js';
 
-/**
- * start server with port
- */
 const PORT = process.env.PORT || 3001;
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
 const server = app.listen(PORT, () => {
-  console.log(`Server ready on port ${PORT}`);
+  console.log(`[${NODE_ENV}] Server ready on port ${PORT}`);
+  console.log(`[${NODE_ENV}] Health check: http://localhost:${PORT}/api/health`);
 });
 
-/**
- * close server
- */
 process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received');
+  console.log('SIGTERM signal received, shutting down gracefully');
   server.close(() => {
     console.log('Server closed');
     process.exit(0);
@@ -24,7 +20,7 @@ process.on('SIGTERM', () => {
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT signal received');
+  console.log('SIGINT signal received, shutting down gracefully');
   server.close(() => {
     console.log('Server closed');
     process.exit(0);

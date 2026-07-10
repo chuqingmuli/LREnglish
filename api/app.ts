@@ -11,6 +11,7 @@ import cors from 'cors'
 import path from 'path'
 import dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
+import fs from 'fs'
 import db from './db/index.js'
 import authRoutes from './routes/auth.js'
 import wordbooksRoutes from './routes/wordbooks.js'
@@ -54,6 +55,25 @@ app.use(
 )
 
 /**
+ * Static files and SPA fallback (production only)
+ */
+const distPath = path.join(__dirname, '../dist')
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath))
+
+  app.get('*', (req: Request, res: Response) => {
+    if (req.path.startsWith('/api/')) {
+      res.status(404).json({
+        success: false,
+        error: 'API not found',
+      })
+      return
+    }
+    res.sendFile(path.join(distPath, 'index.html'))
+  })
+}
+
+/**
  * error handler middleware
  */
 app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
@@ -64,12 +84,12 @@ app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
 })
 
 /**
- * 404 handler
+ * 404 handler (for API requests when dist folder doesn't exist)
  */
 app.use((req: Request, res: Response) => {
   res.status(404).json({
     success: false,
-    error: 'API not found',
+    error: 'Not found',
   })
 })
 
