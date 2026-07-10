@@ -44,7 +44,7 @@ try {
 db.exec(`
   CREATE TABLE IF NOT EXISTS wordbooks (
     id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
+    user_id TEXT,
     name TEXT NOT NULL,
     description TEXT,
     type TEXT NOT NULL DEFAULT 'custom',
@@ -55,6 +55,39 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id)
   )
 `)
+
+// 兼容旧表：如果 wordbooks 表的 user_id 是 NOT NULL，重建表允许 NULL
+try {
+  const wbColumns = db.prepare("PRAGMA table_info(wordbooks)").all() as any[]
+  const userIdCol = wbColumns.find(col => col.name === 'user_id')
+  if (userIdCol && userIdCol.notnull === 1) {
+    // 重建表，user_id 允许 NULL
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS wordbooks_new (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        name TEXT NOT NULL,
+        description TEXT,
+        type TEXT NOT NULL DEFAULT 'custom',
+        word_count INTEGER DEFAULT 0,
+        progress INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `)
+    db.exec(`
+      INSERT INTO wordbooks_new (id, user_id, name, description, type, word_count, progress, created_at, updated_at)
+      SELECT id, user_id, name, description, type, word_count, progress, created_at, updated_at
+      FROM wordbooks
+    `)
+    db.exec('DROP TABLE wordbooks')
+    db.exec('ALTER TABLE wordbooks_new RENAME TO wordbooks')
+    console.log('✅ wordbooks 表迁移完成，user_id 允许 NULL')
+  }
+} catch (error) {
+  console.error('wordbooks 表迁移失败:', error)
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS words (
@@ -236,38 +269,46 @@ function importBuiltInWordbooks() {
         continue
       }
 
-      db.prepare(`
+      console.log(`📚 开始导入内置词书: ${wordbookData.name}...`)
+
+      const insertWordbook = db.prepare(`
         INSERT INTO wordbooks (id, name, description, type, word_count)
         VALUES (?, ?, ?, ?, ?)
-      `).run(wordbookId, wordbookData.name, wordbookData.description, 'system', wordbookData.words?.length || 0)
+      `)
 
-      if (wordbookData.words && wordbookData.words.length > 0) {
-        const insertWord = db.prepare(`
-          INSERT INTO words (id, wordbook_id, word, phonetic, part_of_speech, meaning_cn, meaning_en, example, collins, oxford, bnc, frq, exchange, tag)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `)
+      const insertWord = db.prepare(`
+        INSERT INTO words (id, wordbook_id, word, phonetic, part_of_speech, meaning_cn, meaning_en, example, collins, oxford, bnc, frq, exchange, tag)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
 
-        for (let i = 0; i < wordbookData.words.length; i++) {
-          const word = wordbookData.words[i]
-          const wordId = wordbookId + '-word-' + i
-          insertWord.run(
-            wordId,
-            wordbookId,
-            word.word,
-            word.phonetic,
-            word.part_of_speech,
-            word.meaning_cn,
-            word.meaning_en,
-            word.example,
-            word.collins,
-            word.oxford,
-            word.bnc,
-            word.frq,
-            word.exchange,
-            word.tag
-          )
+      const importTransaction = db.transaction(() => {
+        insertWordbook.run(wordbookId, wordbookData.name, wordbookData.description, 'system', wordbookData.words?.length || 0)
+
+        if (wordbookData.words && wordbookData.words.length > 0) {
+          for (let i = 0; i < wordbookData.words.length; i++) {
+            const word = wordbookData.words[i]
+            const wordId = wordbookId + '-word-' + i
+            insertWord.run(
+              wordId,
+              wordbookId,
+              word.word,
+              word.phonetic,
+              word.part_of_speech,
+              word.meaning_cn,
+              word.meaning_en,
+              word.example,
+              word.collins,
+              word.oxford,
+              word.bnc,
+              word.frq,
+              word.exchange,
+              word.tag
+            )
+          }
         }
-      }
+      })
+
+      importTransaction()
 
       console.log(`✅ 导入内置词书: ${wordbookData.name} (${wordbookData.words?.length || 0} 词)`)
     } catch (error) {
@@ -276,6 +317,8 @@ function importBuiltInWordbooks() {
   }
 }
 
-importBuiltInWordbooks()
+setTimeout(() => {
+  importBuiltInWordbooks()
+}, 100)
 
 export default db

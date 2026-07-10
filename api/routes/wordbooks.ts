@@ -12,8 +12,14 @@ router.use(authMiddleware)
 router.get('/', (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id
-    const stmt = db.prepare('SELECT * FROM wordbooks ORDER BY updated_at DESC')
-    const wordbooks = stmt.all().map((row: any) => {
+    const stmt = db.prepare(`
+      SELECT * FROM wordbooks 
+      WHERE user_id IS NULL OR user_id = ? 
+      ORDER BY 
+        CASE WHEN type = 'system' THEN 0 ELSE 1 END,
+        updated_at DESC
+    `)
+    const wordbooks = stmt.all(userId).map((row: any) => {
       // 计算用户对该词书的掌握进度
       const totalCount = row.word_count || 0
       let learnedCount = 0
@@ -49,17 +55,18 @@ router.get('/', (req: Request, res: Response) => {
 router.post('/', (req: Request, res: Response) => {
   try {
     const { name, description, type = 'custom' } = req.body
+    const userId = (req as any).user.id
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
 
     const stmt = db.prepare(
-      'INSERT INTO wordbooks (id, name, description, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO wordbooks (id, user_id, name, description, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
     )
-    stmt.run(id, name, description, type, now, now)
+    stmt.run(id, userId, name, description, type, now, now)
 
     const newWordbook: WordBook = {
       id,
-      userId: (req as any).user?.id || '',
+      userId,
       name,
       description,
       type: type as 'built-in' | 'custom',
