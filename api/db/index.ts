@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import bcrypt from 'bcryptjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -320,5 +321,32 @@ function importBuiltInWordbooks() {
 setTimeout(() => {
   importBuiltInWordbooks()
 }, 100)
+
+async function createDemoUser() {
+  try {
+    const existing = db.prepare('SELECT id FROM users WHERE username = ?').get('demo')
+    if (existing) {
+      console.log('ℹ️  测试账号已存在: demo / demo123')
+      return
+    }
+
+    const passwordHash = await bcrypt.hash('demo123', 10)
+    const userId = crypto.randomUUID()
+    const now = new Date().toISOString()
+
+    db.prepare(`
+      INSERT INTO users (id, username, email, password_hash, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(userId, 'demo', 'demo@example.com', passwordHash, now, now)
+
+    console.log('✅ 创建测试账号: demo / demo123')
+  } catch (error) {
+    console.error('❌ 创建测试账号失败:', error)
+  }
+}
+
+setTimeout(() => {
+  createDemoUser()
+}, 500)
 
 export default db

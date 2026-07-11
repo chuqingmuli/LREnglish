@@ -167,6 +167,10 @@ export function Login() {
 
           {/* 说明 */}
           <div className="mt-6 pt-6 border-t border-slate-200">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
+              <p className="text-xs text-blue-700 font-medium mb-1">🎯 快速体验</p>
+              <p className="text-xs text-blue-600">测试账号：<span className="font-mono">demo</span> / <span className="font-mono">demo123</span></p>
+            </div>
             <p className="text-xs text-slate-400 text-center">
               登录后可以保存您的学习记录和词书
             </p>
