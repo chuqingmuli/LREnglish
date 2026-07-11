@@ -24,16 +24,16 @@ async function request<T>(url: string, options?: RequestInit): Promise<ApiRespon
       ...options,
     })
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-
     const contentType = response.headers.get('content-type')
-    if (!contentType || !contentType.includes('application/json')) {
-      throw new Error('Response is not JSON')
+    const isJson = contentType && contentType.includes('application/json')
+    const data = isJson ? await response.json() : null
+
+    if (!response.ok) {
+      const errorMsg = data?.error || `HTTP ${response.status}: ${response.statusText}`
+      throw new Error(errorMsg)
     }
 
-    return await response.json()
+    return data || { success: false, error: 'Empty response' }
   } catch (error) {
     console.error('API Error:', error)
     return {
